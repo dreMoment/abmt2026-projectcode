@@ -8,6 +8,7 @@ import org.eqasim.switzerland.ch_cmdp.tolls.TollsModule;
 import org.eqasim.switzerland.ch_cmdp.utils.link_stats.DetailedLinkStatisticsModule;
 import org.eqasim.switzerland.ch_cmdp.transit_dwell.SampledTransitDwellConfigGroup;
 import org.eqasim.switzerland.ch_cmdp.transit_dwell.SampledTransitDwellQSimModule;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeRoutingModule;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.contrib.shared_mobility.run.SharingConfigGroup;
@@ -61,11 +62,15 @@ public class RunSimulation {
 		configurator.configureScenario(scenario);
 		ScenarioUtils.loadScenario(scenario);
 		configurator.adjustScenario(scenario);
+		if (PubliBikeSharing.isEnabled(config)) {
+			PubliBikeSharing.adjustNetwork(scenario.getNetwork());
+		}
 		configurator.adjustPTpcu(scenario);
 		Controler controller = new Controler(scenario);
 		configurator.configureController(controller);
 		if (PubliBikeSharing.isEnabled(config)) {
 			controller.addOverridingModule(new SharingModule());
+			controller.addOverridingModule(new PubliBikeRoutingModule());
 		}
 		controller.addOverridingModule(new PTPassengerCountsModule());
         controller.addOverridingModule(new PTLinkVolumesModule());
