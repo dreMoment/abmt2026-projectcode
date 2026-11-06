@@ -5,13 +5,24 @@ import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.contribs.discrete_mode_choice.model.DiscreteModeChoiceTrip;
 import org.matsim.contribs.discrete_mode_choice.model.mode_availability.ModeAvailability;
+import org.matsim.core.config.Config;
 import org.matsim.core.population.PersonUtils;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
+
+import com.google.inject.Inject;
 
 import java.util.*;
 
 import static org.eqasim.switzerland.ch_cmdp.mode_choice.utilities.estimators.Utils.destinationIsWork;
 
 public class SwissDetailedModeAvailability implements ModeAvailability {
+    private final boolean publibike;
+
+    @Inject
+    public SwissDetailedModeAvailability(Config config) {
+        this.publibike = PubliBikeSharing.isEnabled(config);
+    }
+
     @Override
     public Collection<String> getAvailableModes(Person person, List<DiscreteModeChoiceTrip> trips) {
         Boolean isFreight = (Boolean) person.getAttributes().getAttribute("isFreight");
@@ -83,6 +94,11 @@ public class SwissDetailedModeAvailability implements ModeAvailability {
             if (hasLoopTrip != null && hasLoopTrip) {
                 modes.add(mode);
             }
+        }
+
+        // Bike sharing is open to everyone who is not freight
+        if (publibike) {
+            modes.add(PubliBikeSharing.SERVICE_MODE);
         }
 
         // Add remote walk

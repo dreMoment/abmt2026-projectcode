@@ -12,6 +12,12 @@ public class SwissCmdpModeParameters extends SwissModeParameters {
     public final SwissPTParameters pt = new SwissPTParameters();
     public final SwissWalkParameters walk = new SwissWalkParameters();
     public final SwissCarPassengerParameters cp = new SwissCarPassengerParameters();
+    public final SwissPubliBikeParameters publibike = new SwissPubliBikeParameters();
+
+    // Station-based bike sharing: the bike utility plus this constant (not estimated, zero until calibrated)
+    public static class SwissPubliBikeParameters {
+        public double alpha_u = 0.0;
+    }
 
     public final SwissParking parking = new SwissParking();
 

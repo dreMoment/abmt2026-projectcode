@@ -1,5 +1,7 @@
 package org.eqasim.switzerland.ch_cmdp.mode_choice;
 
+import org.eqasim.switzerland.ch_cmdp.mode_choice.utilities.estimators.SwissPubliBikeUtilityEstimator;
+import org.eqasim.switzerland.ch_cmdp.sharing.SharingStationConstraint;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -70,6 +72,7 @@ public class SwissModeChoiceModule extends AbstractEqasimExtension {
 	static public final String PT_ESTIMATOR_NAME   = "SwissDetailedPtEstimator";
 	static public final String WALK_ESTIMATOR_NAME = "SwissDetailedWalkEstimator";
 	static public final String CP_ESTIMATOR_NAME = "SwissDetailedCpEstimator";
+	static public final String PUBLIBIKE_ESTIMATOR_NAME = "SwissPubliBikeEstimator";
 
 	static public final String LOOP_CONSTRAINT_NAME = "LoopModesConstraint";
 	static public final String REMOTE_WALK_CONSTRAINT_NAME = "RemoteWalkConstraint";
@@ -85,6 +88,7 @@ public class SwissModeChoiceModule extends AbstractEqasimExtension {
 		bindTripConstraintFactory(LOOP_CONSTRAINT_NAME).to(LoopModesConstraint.Factory.class);
 		bindTripConstraintFactory(REMOTE_WALK_CONSTRAINT_NAME).to(RemoteWalkConstraint.Factory.class);
 		bindTripConstraintFactory(BORDER_CONSTRAINT_NAME).to(BorderConstraint.Factory.class);
+		bindTripConstraintFactory(SharingStationConstraint.NAME).to(SharingStationConstraint.Factory.class);
 
 		bindCostModel(CAR_COST_MODEL_NAME).to(SwissCarCostModel.class);
 		bindCostModel(CAR_WEISS_COST_MODEL_NAME).to(SwissWeissCarCostModel.class);
@@ -94,6 +98,7 @@ public class SwissModeChoiceModule extends AbstractEqasimExtension {
 		bindUtilityEstimator(PT_ESTIMATOR_NAME).to(SwissPtDetailedUtilityEstimator.class);
 		bindUtilityEstimator(WALK_ESTIMATOR_NAME).to(SwissWalkDetailedUtilityEstimator.class);
 		bindUtilityEstimator(CP_ESTIMATOR_NAME).to(SwissCarPassengerDetailedUtilityEstimator.class);
+		bindUtilityEstimator(PUBLIBIKE_ESTIMATOR_NAME).to(SwissPubliBikeUtilityEstimator.class);
 
 		bindCostModel(PT_COST_MODEL_NAME).to(SwissPtCostModel.class);
 
