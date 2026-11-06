@@ -8,7 +8,11 @@ import org.eqasim.switzerland.ch_cmdp.tolls.TollsModule;
 import org.eqasim.switzerland.ch_cmdp.utils.link_stats.DetailedLinkStatisticsModule;
 import org.eqasim.switzerland.ch_cmdp.transit_dwell.SampledTransitDwellConfigGroup;
 import org.eqasim.switzerland.ch_cmdp.transit_dwell.SampledTransitDwellQSimModule;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
 import org.matsim.api.core.v01.Scenario;
+import org.matsim.contrib.shared_mobility.run.SharingConfigGroup;
+import org.matsim.contrib.shared_mobility.run.SharingModule;
+import org.matsim.contrib.shared_mobility.service.SharingUtils;
 import org.matsim.core.config.CommandLine;
 import org.matsim.core.config.CommandLine.ConfigurationException;
 import org.matsim.core.config.Config;
@@ -27,6 +31,7 @@ public class RunSimulation {
 		// this is especially important to avoid high waiting times when we cutout scenarios from a larger scenario.
 		CommandLine cmd = new CommandLine.Builder(args) //
 				.requireOptions("config-path") //
+				.allowOptions("publibike-service-path") //
 				.allowPrefixes("mode-parameter", "cost-parameter", "preventwaitingtoentertraffic", "samplingRateForPT") //
 				.build();
 
@@ -34,6 +39,11 @@ public class RunSimulation {
 		Config config = ConfigUtils.loadConfig(cmd.getOptionStrict("config-path"), new SampledTransitDwellConfigGroup());
 		configurator.updateConfig(config);
 		configurator.configure(config);
+
+		// Optional PubliBike bike sharing: --publibike-service-path publibike_service.xml
+		if (cmd.hasOption("publibike-service-path")) {
+			PubliBikeSharing.configure(config, cmd.getOptionStrict("publibike-service-path"));
+		}
 		cmd.applyConfiguration(config);
 
 		if (cmd.hasOption("preventwaitingtoentertraffic")) {
@@ -54,6 +64,9 @@ public class RunSimulation {
 		configurator.adjustPTpcu(scenario);
 		Controler controller = new Controler(scenario);
 		configurator.configureController(controller);
+		if (PubliBikeSharing.isEnabled(config)) {
+			controller.addOverridingModule(new SharingModule());
+		}
 		controller.addOverridingModule(new PTPassengerCountsModule());
         controller.addOverridingModule(new PTLinkVolumesModule());
 		controller.addOverridingModule(new StrategyWeightDecayModule());
@@ -66,6 +79,10 @@ public class RunSimulation {
 		controller.configureQSimComponents(components -> {
 			new SBBTransitEngineQSimModule().configure(components);
 
+			if (PubliBikeSharing.isEnabled(config)) {
+				SharingUtils.configureQSim((SharingConfigGroup) config.getModules().get(SharingConfigGroup.GROUP_NAME))
+						.configure(components);
+			}
 		});
 		controller.addOverridingQSimModule(new SampledTransitDwellQSimModule());
 		// save updated config before running the simulation
