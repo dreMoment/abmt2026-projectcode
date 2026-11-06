@@ -11,7 +11,6 @@ import java.util.Random;
 
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
-import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.shared_mobility.io.DefaultSharingServiceSpecification;
@@ -34,7 +33,7 @@ import org.matsim.core.utils.io.IOUtils;
  *
  * Inputs are two CSV files. stations.csv has station_id, lat and lng.
  * bikes.csv has bike_id and station_id. Each station is placed on the nearest
- * car link of the network. With --fleet-share (for example 0.1 for a 10%
+ * link that shared bikes are routed on. With --fleet-share (for example 0.1 for a 10%
  * scenario) a seeded random share of bikes is kept. PubliBike stations are
  * never full, so each station can hold the whole fleet.
  *
@@ -61,10 +60,11 @@ public class RunCreatePubliBikeService {
 
 		double fleetShare = cmd.getOption("fleet-share").map(Double::parseDouble).orElse(1.0);
 
-		// Stations are placed on car links, which excludes rail and pt-only links
+		// Stations are placed on the links that shared bikes are routed on
 		Network fullNetwork = NetworkUtils.readNetwork(cmd.getOptionStrict("network-path"));
+		PubliBikeSharing.adjustNetwork(fullNetwork);
 		Network network = NetworkUtils.createNetwork();
-		new TransportModeNetworkFilter(fullNetwork).filter(network, java.util.Set.of(TransportMode.car));
+		new TransportModeNetworkFilter(fullNetwork).filter(network, java.util.Set.of(PubliBikeSharing.MODE));
 
 		CoordinateTransformation transformation = TransformationFactory
 				.getCoordinateTransformation(TransformationFactory.WGS84, "EPSG:2056");
@@ -104,7 +104,7 @@ public class RunCreatePubliBikeService {
 
 		if (farStations > stationLinks.size() / 2) {
 			throw new IllegalStateException(farStations + " of " + stationLinks.size()
-					+ " stations are far from any car link. Is the network in EPSG:2056?");
+					+ " stations are far from any bike link. Is the network in EPSG:2056?");
 		}
 
 		for (String[] bike : bikes) {

@@ -5,34 +5,34 @@ import java.util.Set;
 
 import org.eqasim.core.components.config.EqasimConfigGroup;
 import org.eqasim.switzerland.ch_cmdp.mode_choice.SwissModeChoiceModule;
+import org.matsim.api.core.v01.TransportMode;
+import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.shared_mobility.run.SharingConfigGroup;
 import org.matsim.contrib.shared_mobility.run.SharingServiceConfigGroup;
 import org.matsim.contrib.shared_mobility.run.SharingServiceConfigGroup.ServiceScheme;
 import org.matsim.contrib.shared_mobility.service.SharingUtils;
 import org.matsim.contribs.discrete_mode_choice.modules.config.DiscreteModeChoiceConfigGroup;
 import org.matsim.core.config.Config;
-import org.matsim.core.config.groups.RoutingConfigGroup.TeleportedModeParams;
 import org.matsim.core.config.groups.ScoringConfigGroup.ActivityParams;
 import org.matsim.core.config.groups.ScoringConfigGroup.ModeParams;
 import org.matsim.core.config.groups.ScoringConfigGroup.ScoringParameterSet;
+import org.matsim.core.network.NetworkUtils;
+import org.matsim.core.network.algorithms.MultimodalNetworkCleaner;
 
 /**
  * Config setup for station-based bike sharing (PubliBike).
  *
- * The shared bike leg uses its own teleported mode "publibike". This version
- * of the shared_mobility contrib puts a default (car) vehicle on the network
- * for network-routed modes, so routing it as "bike" would give shared bikes car
- * speeds and mix them into private bike volumes.
+ * The shared bike leg uses its own mode "publibike", routed over the bike
+ * network by {@link PubliBikeRoutingModule}. It is not a QSim main mode, so it
+ * is teleported along its route: the contrib would otherwise put a default
+ * (car) vehicle into traffic, and the bikes would mix into private bike volumes.
  */
 public final class PubliBikeSharing {
 	static public final String MODE = "publibike";
 	static public final String SERVICE_MODE = SharingUtils.MODE_PREFIX + MODE; // the mode choice alternative
 
 	static private final double MAXIMUM_ACCESS_EGRESS_DISTANCE_M = 1000.0;
-
-	// Same as teleported bike in SwitzerlandConfigurator.removeBikeFromRoutedModes
-	static private final double TELEPORTED_SPEED_M_S = 4.0;
-	static private final double BEELINE_DISTANCE_FACTOR = 1.4;
 
 	private PubliBikeSharing() {
 	}
@@ -54,11 +54,6 @@ public final class PubliBikeSharing {
 		sharingConfig.addService(service);
 		config.addModule(sharingConfig);
 
-		TeleportedModeParams routing = new TeleportedModeParams(MODE);
-		routing.setTeleportedModeSpeed(TELEPORTED_SPEED_M_S);
-		routing.setBeelineDistanceFactor(BEELINE_DISTANCE_FACTOR);
-		config.routing().addTeleportedModeParams(routing);
-
 		for (ScoringParameterSet scoring : config.scoring().getScoringParametersPerSubpopulation().values()) {
 			scoring.addModeParams(new ModeParams(MODE));
 
@@ -75,5 +70,20 @@ public final class PubliBikeSharing {
 		Set<String> tripConstraints = new HashSet<>(dmcConfig.getTripConstraints());
 		tripConstraints.add(SharingStationConstraint.NAME);
 		dmcConfig.setTripConstraints(tripConstraints);
+	}
+
+	/**
+	 * Allows shared bikes on the bike links of the largest strongly connected
+	 * part of the bike network.
+	 * Stations and routes both use these links.
+	 */
+	static public void adjustNetwork(Network network) {
+		for (Link link : network.getLinks().values()) {
+			if (link.getAllowedModes().contains(TransportMode.bike)) {
+				NetworkUtils.addAllowedMode(link, MODE);
+			}
+		}
+
+		new MultimodalNetworkCleaner(network).run(Set.of(MODE));
 	}
 }
