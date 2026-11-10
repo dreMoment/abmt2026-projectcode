@@ -20,6 +20,7 @@ public class AlphaCalibratorConfig extends ReflectiveConfigGroup {
     static private final String FILE_PATH = "filePath";
     static private final String LEVEL = "level";
     static private final String CALIBRATED_MODES = "calibratedModes";
+    static private final String TRIPS_PER_DAY = "tripsPerDay";
 
     private boolean activate = false;
     private double beta = 0.3;
@@ -31,6 +32,7 @@ public class AlphaCalibratorConfig extends ReflectiveConfigGroup {
     private String filePath = "";
     private String level = "global";
     private String calibratedModes = "car,pt,walk,bike,car_passenger";
+    private String tripsPerDay = "";
 
     public AlphaCalibratorConfig() {
         super(GROUP_NAME);
@@ -49,7 +51,11 @@ public class AlphaCalibratorConfig extends ReflectiveConfigGroup {
         map.put(FILE_PATH, "In case of using canton level calibration, this is the path to the csv file containing modes shares per canton");
         map.put(LEVEL, "Level of calibration: current implementation contains either 'global', 'canton', or 'cluster'");
         map.put(CALIBRATED_MODES, "Comma-separated list of modes to be calibrated (default: car,pt,walk,bike,car_passenger)," +
-                "in the default case, pt is used as reference mode, while the other modes are calibrated to match the target mode shares");
+                "in the default case, pt is used as reference mode, while the other modes are calibrated to match the target mode shares. " +
+                "Without pt, each listed mode is calibrated on its own and the other alphas stay unchanged");
+        map.put(TRIPS_PER_DAY, "Targets given as observed trips per day of the full population instead of a share, as " +
+                "comma-separated mode:trips (e.g. sharing_publibike:5629). Each iteration, they are turned into a share " +
+                "using eqasim.sampleSize and the considered trips of the selected plans (only used by the global level)");
         return map;
     }
 
@@ -60,6 +66,20 @@ public class AlphaCalibratorConfig extends ReflectiveConfigGroup {
     @StringSetter(CALIBRATED_MODES)
     public void setCalibratedModes(String calibratedModes) {
         this.calibratedModes = calibratedModes;
+    }
+
+    @StringGetter(TRIPS_PER_DAY)
+    public String getTripsPerDay() {
+        return tripsPerDay;
+    }
+    @StringSetter(TRIPS_PER_DAY)
+    public void setTripsPerDay(String tripsPerDay) {
+        AlphaCalibrationUtils.parseTripsPerDay(tripsPerDay); // fail early on a malformed value
+        this.tripsPerDay = tripsPerDay;
+    }
+
+    public Map<String, Double> getTripsPerDayMap() {
+        return AlphaCalibrationUtils.parseTripsPerDay(tripsPerDay);
     }
 
     @StringGetter(FILE_PATH)
