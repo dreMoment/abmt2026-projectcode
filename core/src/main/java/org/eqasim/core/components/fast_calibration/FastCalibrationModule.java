@@ -43,6 +43,6 @@ public class FastCalibrationModule extends AbstractEqasimExtension {
         );
         boolean isActivated = calConfig.isActivate();
         List<String> modesToCalibrate = calConfig.getCalibratedModes();
-        return new AlphaCalibrator(scenario,outputHierarchy,modeParameters,tripListConverter,targetModeShares, modesToCalibrate, beta, isActivated, eqasimConfigGroup);
+        return new AlphaCalibrator(scenario,outputHierarchy,modeParameters,tripListConverter,targetModeShares, calConfig.getTripsPerDayMap(), modesToCalibrate, beta, isActivated, eqasimConfigGroup);
     }
 }

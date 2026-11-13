@@ -30,6 +30,8 @@ public class AlphaCalibrator implements FastCalibration {
 
     // Calibration parameters
     private final Map<String, Double> targetModeShares;
+    // observed trips per day of the full population, for modes whose target is a count (e.g. bike sharing rides)
+    private final Map<String, Double> targetTripsPerDay;
     private final double beta;
     private final boolean isActivated;
     private final List<String> modesToCalibrate;
@@ -41,7 +43,7 @@ public class AlphaCalibrator implements FastCalibration {
 
     // Mode share tracking
     private final Map<String, Double> shares = new HashMap<>();
-    private final Set<String> consideredModes = Set.of(TransportMode.car, TransportMode.pt, TransportMode.walk, TransportMode.bike, "car_passenger");
+    private final Set<String> consideredModes = new HashSet<>(Set.of(TransportMode.car, TransportMode.pt, TransportMode.walk, TransportMode.bike, "car_passenger"));
     private int replannedTripsCount = 0;
     private int changedUtilityCount = 0;
 
@@ -62,8 +64,30 @@ public class AlphaCalibrator implements FastCalibration {
                            double beta,
                            boolean isActivated,
                            EqasimConfigGroup eqasimConfigGroup) {
+        this(scenario, outputHierarchy, modeParameters, tripListConverter, targetModeShares, Map.of(),
+                modesToCalibrate, beta, isActivated, eqasimConfigGroup);
+    }
 
-        this.targetModeShares = targetModeShares;
+    /**
+     * @param targetTripsPerDay observed trips per day of the full population for modes whose target is a count.
+     *                          Each iteration, the count is turned into a target share using the sample size and
+     *                          the number of considered trips in the selected plans.
+     */
+    public AlphaCalibrator(Scenario scenario,
+                           OutputDirectoryHierarchy outputHierarchy,
+                           ModeParameters modeParameters,
+                           TripListConverter tripListConverter,
+                           Map<String, Double> targetModeShares,
+                           Map<String, Double> targetTripsPerDay,
+                           List<String> modesToCalibrate,
+                           double beta,
+                           boolean isActivated,
+                           EqasimConfigGroup eqasimConfigGroup) {
+
+        this.targetModeShares = new HashMap<>(targetModeShares);
+        this.targetTripsPerDay = Map.copyOf(targetTripsPerDay);
+        this.consideredModes.addAll(targetModeShares.keySet());
+        this.consideredModes.addAll(targetTripsPerDay.keySet());
         this.scenario = scenario;
         this.outputHierarchy = outputHierarchy;
         this.modeParameters = modeParameters;
@@ -83,13 +107,18 @@ public class AlphaCalibrator implements FastCalibration {
     public void checkTargetModeShares() {
         // Check first that the required modes are present in the target mode shares
         for (String mode : modesToCalibrate) {
-            if (!targetModeShares.containsKey(mode)) {
-                throw new IllegalArgumentException("Target mode shares must contain the mode: " + mode);
+            if (!targetModeShares.containsKey(mode) && !targetTripsPerDay.containsKey(mode)) {
+                throw new IllegalArgumentException("Target mode shares or target trips per day must contain the mode: " + mode);
+            }
+            if (!modeParameters.getASCs().containsKey(mode)) {
+                throw new IllegalArgumentException("The mode parameters have no alpha for the calibrated mode: " + mode);
             }
         }
-        // pt is used as reference mode, it should be in the list of modes to calibrate
-        if (!modesToCalibrate.contains("pt")) {
-            throw new IllegalArgumentException("The list of modes to calibrate must contain 'pt', as it is used as reference mode for calibration.");
+        // pt is the reference mode only if it is calibrated. Without pt, each listed mode is calibrated on its own
+        // and all other constants stay as they are, so the shares of the other modes need not add up.
+        if (!usesPtReference()) {
+            logger.info("pt is not in the calibrated modes: calibrating " + modesToCalibrate + " without a reference mode.");
+            return;
         }
         // ensure the sum of target mode shares is below 1.0 (if passenger_car is not given, else it is 1.0)
         double sumOfShares = targetModeShares.values().stream().mapToDouble(Double::doubleValue).sum();
@@ -153,10 +182,49 @@ public class AlphaCalibrator implements FastCalibration {
 
     private void updateShares() {
         Map<String, Double> estimatedShares = computeModeSharesFromPlans();
+        updateTripTargets();
         for (String mode : targetModeShares.keySet()) {
             double replannedTripsShare = estimatedShares.getOrDefault(mode, 0.0); //0.0 because maybe no trip was recorded for this mode
             shares.put(mode, replannedTripsShare);
         }
+    }
+
+    /**
+     * Turns the trips-per-day targets into target shares: observed trips, scaled to the sample, divided by the
+     * considered trips of all selected plans (counted with the same filter as the replanned trips).
+     */
+    private void updateTripTargets() {
+        if (targetTripsPerDay.isEmpty()) {
+            return;
+        }
+        int consideredTrips = 0;
+        for (Person person : scenario.getPopulation().getPersons().values()) {
+            if (NotConsideredPerson(person)) {
+                continue;
+            }
+            for (DiscreteModeChoiceTrip trip : tripListConverter.convert(person.getSelectedPlan())) {
+                if (isCountedTrip(trip)) {
+                    consideredTrips++;
+                }
+            }
+        }
+        for (Map.Entry<String, Double> entry : targetTripsPerDay.entrySet()) {
+            double share = AlphaCalibrationUtils.targetShareFromTrips(entry.getValue(),
+                    eqasimConfigGroup.getSampleSize(), consideredTrips);
+            targetModeShares.put(entry.getKey(), share);
+            logger.info(String.format("Target share of %s: %.6f (%.0f trips per day, %d considered trips in the sample)",
+                    entry.getKey(), share, entry.getValue(), consideredTrips));
+        }
+    }
+
+    /** A trip counts for the shares if it has a considered mode, does not start or end outside, and moves. */
+    private boolean isCountedTrip(DiscreteModeChoiceTrip trip) {
+        boolean sameLocation = trip.getOriginActivity().getCoord().equals(trip.getDestinationActivity().getCoord());
+        return AlphaCalibrationUtils.isConsideredTrip(trip) && consideredModes.contains(trip.getInitialMode()) && !sameLocation;
+    }
+
+    private boolean usesPtReference() {
+        return modesToCalibrate.contains(TransportMode.pt);
     }
 
     protected boolean NotConsideredPerson(Person person){
@@ -179,10 +247,8 @@ public class AlphaCalibrator implements FastCalibration {
 
                 for (DiscreteModeChoiceTrip trip : trips) {
                     String mode = trip.getInitialMode();
-                    boolean sameLocation = trip.getOriginActivity().getCoord().equals(trip.getDestinationActivity().getCoord());
-                    boolean consideredTrip = AlphaCalibrationUtils.isConsideredTrip(trip);
                     // only consider trips with considered modes and different locations
-                    if (consideredTrip && consideredModes.contains(mode) && !sameLocation) {
+                    if (isCountedTrip(trip)) {
                         estimatedShares.put(mode, estimatedShares.getOrDefault(mode, 0.0) + 1.0);
                         tripIdx.add(trip.getIndex());
                         replannedTripsCount += 1; // Count the number of replanned plans
@@ -212,10 +278,15 @@ public class AlphaCalibrator implements FastCalibration {
         Map<String, Double> alphas = getAlphas();
         Map<String, Double> newAlphas = new HashMap<>();
         double epsilon = 0.0001; // Small value to avoid log(0) issues
-        // Reference mode is pt, its alpha remains unchanged, 0.0
-        double mo = Math.max(shares.get("pt"), epsilon);
-        double zo = Math.max(targetModeShares.get("pt"), epsilon);
-        newAlphas.put("pt", 0.0);
+        // If pt is calibrated, it is the reference mode: its alpha is set to 0.0 and the other updates are relative to it.
+        // Otherwise, each calibrated mode is moved towards its own target and pt keeps its alpha.
+        double referenceCorrection = 0.0;
+        if (usesPtReference()) {
+            double mo = Math.max(shares.get("pt"), epsilon);
+            double zo = Math.max(targetModeShares.get("pt"), epsilon);
+            referenceCorrection = Math.log(zo) - Math.log(mo);
+            newAlphas.put("pt", 0.0);
+        }
         // update alphas for other modes
         for (String mode : modesToCalibrate) {
             if (mode.equals("pt")) {
@@ -226,7 +297,7 @@ public class AlphaCalibrator implements FastCalibration {
             double zi = Math.max(targetModeShares.get(mode), epsilon);
             double alpha = alphas.get(mode);
             // Calculate the new alpha value based on the current share and the target share
-            double newAlpha = alpha + (Math.log(zi)-Math.log(mi)) - (Math.log(zo)-Math.log(mo));
+            double newAlpha = alpha + (Math.log(zi)-Math.log(mi)) - referenceCorrection;
             // update it using EMA
             double effectiveBeta = getEffectiveBeta(iteration);
             newAlpha = effectiveBeta * alpha + (1.0 - effectiveBeta) * newAlpha;
@@ -275,10 +346,11 @@ public class AlphaCalibrator implements FastCalibration {
     private void saveSharesToFile(int iteration) {
         File outputFile = new File(outputHierarchy.getIterationFilename(iteration, "shares.csv"));
         try (PrintWriter writer = new PrintWriter(outputFile)) {
-            writer.println("mode,share,replanned_trips_count,changed_utility_count");
+            writer.println("mode,share,replanned_trips_count,changed_utility_count,target_share");
             for (Map.Entry<String, Double> entry : shares.entrySet()) {
                 String mode = entry.getKey();
-                writer.printf("%s,%.4f,%d,%d%n", mode, entry.getValue(), replannedTripsCount, changedUtilityCount);
+                writer.printf(Locale.ROOT, "%s,%.6f,%d,%d,%.6f%n", mode, entry.getValue(), replannedTripsCount, changedUtilityCount,
+                        targetModeShares.getOrDefault(mode, Double.NaN));
             }
         } catch (IOException e) {
             throw new RuntimeException("Error writing shares to file: " + outputFile.getAbsolutePath(), e);

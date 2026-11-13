@@ -1,6 +1,7 @@
 package org.eqasim.switzerland.ch_cmdp.mode_choice.parameters;
 
 import org.eqasim.switzerland.ch.mode_choice.parameters.SwissModeParameters;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -510,6 +511,7 @@ public class SwissCmdpModeParameters extends SwissModeParameters {
         alphas.put("walk", this.walk.alpha_u);
         alphas.put("bike", this.bike.alpha_u);
         alphas.put("car_passenger", this.cp.alpha_u);
+        alphas.put(PubliBikeSharing.SERVICE_MODE, this.publibike.alpha_u);
         return alphas;
     }
 
@@ -520,6 +522,7 @@ public class SwissCmdpModeParameters extends SwissModeParameters {
         this.walk.alpha_u = alphas.getOrDefault("walk", this.walk.alpha_u);
         this.bike.alpha_u = alphas.getOrDefault("bike", this.bike.alpha_u);
         this.cp.alpha_u = alphas.getOrDefault("car_passenger", this.cp.alpha_u);
+        this.publibike.alpha_u = alphas.getOrDefault(PubliBikeSharing.SERVICE_MODE, this.publibike.alpha_u);
     }
 
     @Override
@@ -530,6 +533,7 @@ public class SwissCmdpModeParameters extends SwissModeParameters {
                 {bike, "bike"},
                 {walk, "walk"},
                 {cp, "cp"},
+                {publibike, "publibike"},
                 {parking, "parking"},
                 {swissCanton, "swissCanton"}
         };
