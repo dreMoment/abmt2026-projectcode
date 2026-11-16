@@ -52,8 +52,7 @@ public class AlphaCalibrationUtils {
     }
 
     /**
-     * Target share of a mode with a count target: simulated trips per day divided by the considered trips of the
-     * simulated population. The count is not scaled by the sample size.
+     * Target share of a mode with a count: simulated trips per day divided by the considered trips of the sample.
      */
     public static double targetShareFromTrips(double tripsPerDay, int consideredTrips) {
         if (consideredTrips <= 0) {

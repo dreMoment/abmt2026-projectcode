@@ -30,7 +30,7 @@ public class AlphaCalibrator implements FastCalibration {
 
     // Calibration parameters
     private final Map<String, Double> targetModeShares;
-    // simulated trips per day (not scaled by the sample size), for modes whose target is a count (e.g. bike sharing rides)
+    // simulated trips per day, for modes whose target is a count (e.g. bike sharing rides)
     private final Map<String, Double> targetTripsPerDay;
     private final double beta;
     private final boolean isActivated;
@@ -69,9 +69,9 @@ public class AlphaCalibrator implements FastCalibration {
     }
 
     /**
-     * @param targetTripsPerDay simulated trips per day for modes whose target is a count. It is not scaled by the
-     *                          sample size. Each iteration, the count is turned into a target share using the
-     *                          number of considered trips in the selected plans.
+     * @param targetTripsPerDay simulated trips per day for modes whose target is a count.
+     *                          Each iteration, the count is turned into a target share using
+     *                          the number of considered trips in the selected plans.
      */
     public AlphaCalibrator(Scenario scenario,
                            OutputDirectoryHierarchy outputHierarchy,
@@ -209,7 +209,8 @@ public class AlphaCalibrator implements FastCalibration {
             }
         }
         for (Map.Entry<String, Double> entry : targetTripsPerDay.entrySet()) {
-            double share = AlphaCalibrationUtils.targetShareFromTrips(entry.getValue(), consideredTrips);
+            double share = AlphaCalibrationUtils.targetShareFromTrips(entry.getValue(),
+                    consideredTrips);
             targetModeShares.put(entry.getKey(), share);
             logger.info(String.format("Target share of %s: %.6f (%.0f trips per day, %d considered trips in the sample)",
                     entry.getKey(), share, entry.getValue(), consideredTrips));
