@@ -33,10 +33,10 @@ public class TestAlphaCalibrationUtils {
     }
 
     @Test
-    public void testTargetShareFromTripsScalesToTheSample() {
-        // 5629 rides per day in the full population are 562.9 rides in a 10% sample
-        assertEquals(562.9 / 500_000.0, AlphaCalibrationUtils.targetShareFromTrips(5629.0, 0.1, 500_000), 1e-12);
-        assertThrows(IllegalStateException.class, () -> AlphaCalibrationUtils.targetShareFromTrips(5629.0, 0.1, 0));
+    public void testTargetShareFromTripsIsNotScaledBySampleSize() {
+        // 5629 simulated rides per day out of 500000 considered trips
+        assertEquals(5629.0 / 500_000.0, AlphaCalibrationUtils.targetShareFromTrips(5629.0, 500_000), 1e-12);
+        assertThrows(IllegalStateException.class, () -> AlphaCalibrationUtils.targetShareFromTrips(5629.0, 0));
     }
 
     @Test

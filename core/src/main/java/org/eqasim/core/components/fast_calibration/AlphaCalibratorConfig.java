@@ -53,9 +53,9 @@ public class AlphaCalibratorConfig extends ReflectiveConfigGroup {
         map.put(CALIBRATED_MODES, "Comma-separated list of modes to be calibrated (default: car,pt,walk,bike,car_passenger)," +
                 "in the default case, pt is used as reference mode, while the other modes are calibrated to match the target mode shares. " +
                 "Without pt, each listed mode is calibrated on its own and the other alphas stay unchanged");
-        map.put(TRIPS_PER_DAY, "Targets given as observed trips per day of the full population instead of a share, as " +
-                "comma-separated mode:trips (e.g. sharing_publibike:5629). Each iteration, they are turned into a share " +
-                "using eqasim.sampleSize and the considered trips of the selected plans (only used by the global level)");
+        map.put(TRIPS_PER_DAY, "Targets given as simulated trips per day instead of a share, as comma-separated mode:trips " +
+                "(e.g. sharing_publibike:5629). The count is not scaled by eqasim.sampleSize. Each iteration, it is " +
+                "turned into a share using the considered trips of the selected plans (only used by the global level)");
         return map;
     }
 
