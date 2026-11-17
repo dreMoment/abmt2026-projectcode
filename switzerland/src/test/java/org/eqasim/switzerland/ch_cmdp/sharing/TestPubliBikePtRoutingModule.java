@@ -115,6 +115,25 @@ public class TestPubliBikePtRoutingModule {
 				new LinkWrapperFacility(to), DEPARTURE_TIME, null)));
 	}
 
+	@Test
+	public void testNoRouteForShortTrips() {
+		PubliBikeTestNetwork shortTrip = new PubliBikeTestNetwork();
+		Link from = shortTrip.link("origin", 0.0, 0.0);
+		Link to = shortTrip.link("destination", PubliBikePt.MINIMUM_TRIP_DISTANCE_M - 1.0, 0.0);
+		shortTrip.stop("rail", 500.0, 0.0, "rail");
+		shortTrip.station("station", 500.0, 0.0);
+
+		for (Direction direction : Direction.values()) {
+			String mode = direction == Direction.ACCESS ? PubliBikePt.ACCESS_MODE : PubliBikePt.EGRESS_MODE;
+			PubliBikePtRoutingModule router = new PubliBikePtRoutingModule(mode, direction, publibike(Set.of()),
+					pt(Map.of(), Set.of()), shortTrip.transferStations(300.0), PopulationUtils.getFactory(),
+					timeInterpretation);
+
+			assertNull(router.calcRoute(DefaultRoutingRequest.withoutAttributes(new LinkWrapperFacility(from),
+					new LinkWrapperFacility(to), DEPARTURE_TIME, null)));
+		}
+	}
+
 	private PubliBikePtRoutingModule router(Direction direction, RoutingModule publibike, RoutingModule pt) {
 		String mode = direction == Direction.ACCESS ? PubliBikePt.ACCESS_MODE : PubliBikePt.EGRESS_MODE;
 		return new PubliBikePtRoutingModule(mode, direction, publibike, pt, test.transferStations(300.0),

@@ -33,6 +33,11 @@ public final class PubliBikePt {
 	static public final double TRANSFER_RADIUS_M = 300.0;
 	/** Number of transfer stations routed per trip. The one with the earliest arrival is kept. */
 	static public final int CANDIDATE_STATIONS = 3;
+	/**
+	 * Shorter trips (beeline between origin and destination) are not offered as combined trips. Checking this before
+	 * routing keeps mode choice fast, because most trips in the city are short.
+	 */
+	static public final double MINIMUM_TRIP_DISTANCE_M = 3000.0;
 
 	private PubliBikePt() {
 	}

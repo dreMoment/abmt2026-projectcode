@@ -16,6 +16,7 @@ import org.matsim.core.router.DefaultRoutingRequest;
 import org.matsim.core.router.LinkWrapperFacility;
 import org.matsim.core.router.RoutingModule;
 import org.matsim.core.router.RoutingRequest;
+import org.matsim.core.utils.geometry.CoordUtils;
 import org.matsim.core.utils.timing.TimeInterpretation;
 import org.matsim.facilities.Facility;
 import org.matsim.utils.objectattributes.attributable.Attributes;
@@ -24,7 +25,8 @@ import org.matsim.utils.objectattributes.attributable.Attributes;
  * Routes a trip that combines one PubliBike ride with public transport, joined at a PubliBike station next to a
  * railway stop.
  *
- * Up to {@link PubliBikePt#CANDIDATE_STATIONS} transfer stations are tried (see
+ * Trips shorter than {@link PubliBikePt#MINIMUM_TRIP_DISTANCE_M} (beeline) get no route. Otherwise, up to
+ * {@link PubliBikePt#CANDIDATE_STATIONS} transfer stations are tried (see
  * {@link PubliBikeTransferStations#findCandidates}). The route with the earliest arrival is returned. A
  * candidate is dropped if the sharing router finds no ride (no station near the trip end, or the same station
  * at both ends) or if public transport finds no vehicle leg. Without any candidate the result is null, and
@@ -66,6 +68,10 @@ public class PubliBikePtRoutingModule implements RoutingModule {
 		Facility from = request.getFromFacility();
 		Facility to = request.getToFacility();
 		double departureTime = request.getDepartureTime();
+
+		if (CoordUtils.calcEuclideanDistance(from.getCoord(), to.getCoord()) < PubliBikePt.MINIMUM_TRIP_DISTANCE_M) {
+			return null;
+		}
 
 		Coord bikeEnd = direction == Direction.ACCESS ? from.getCoord() : to.getCoord();
 		Coord otherEnd = direction == Direction.ACCESS ? to.getCoord() : from.getCoord();
