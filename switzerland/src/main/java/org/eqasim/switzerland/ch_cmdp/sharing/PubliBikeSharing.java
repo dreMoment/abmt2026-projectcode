@@ -1,5 +1,6 @@
 package org.eqasim.switzerland.ch_cmdp.sharing;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -70,6 +71,20 @@ public final class PubliBikeSharing {
 		Set<String> tripConstraints = new HashSet<>(dmcConfig.getTripConstraints());
 		tripConstraints.add(SharingStationConstraint.NAME);
 		dmcConfig.setTripConstraints(tripConstraints);
+
+		addCachedModes(config, Set.of(SERVICE_MODE));
+	}
+
+	/**
+	 * The tour-based model estimates (and routes) an uncached mode once per mode combination of the tour. Caching
+	 * estimates each trip only once per mode, as for car and pt.
+	 */
+	static void addCachedModes(Config config, Collection<String> modes) {
+		DiscreteModeChoiceConfigGroup dmcConfig = (DiscreteModeChoiceConfigGroup) config.getModules()
+				.get(DiscreteModeChoiceConfigGroup.GROUP_NAME);
+		Set<String> cachedModes = new HashSet<>(dmcConfig.getCachedModes());
+		cachedModes.addAll(modes);
+		dmcConfig.setCachedModes(cachedModes);
 	}
 
 	/**

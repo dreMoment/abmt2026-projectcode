@@ -73,5 +73,7 @@ public final class PubliBikePt {
 		for (String mode : MODES) {
 			eqasimConfig.setEstimator(mode, SwissModeChoiceModule.PUBLIBIKE_PT_ESTIMATOR_NAME);
 		}
+
+		PubliBikeSharing.addCachedModes(config, MODES);
 	}
 }
