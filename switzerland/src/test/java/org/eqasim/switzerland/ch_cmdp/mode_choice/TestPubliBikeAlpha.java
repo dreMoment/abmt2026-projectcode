@@ -1,6 +1,7 @@
 package org.eqasim.switzerland.ch_cmdp.mode_choice;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -8,6 +9,7 @@ import java.util.Map;
 
 import org.eqasim.core.simulation.mode_choice.ParameterDefinition;
 import org.eqasim.switzerland.ch_cmdp.mode_choice.parameters.SwissCmdpModeParameters;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikePt;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
 import org.junit.Rule;
 import org.junit.Test;
@@ -27,6 +29,16 @@ public class TestPubliBikeAlpha {
 		parameters.setASCs(Map.of(PubliBikeSharing.SERVICE_MODE, 2.3));
 		assertEquals(2.3, parameters.publibike.alpha_u, 1e-12);
 		assertEquals(carAlpha, parameters.car.alpha_u, 1e-12); // modes missing from the map keep their alpha
+	}
+
+	@Test
+	public void testCombinedTripsCountForThePubliBikeAlpha() {
+		SwissCmdpModeParameters parameters = SwissCmdpModeParameters.buildDefault();
+		for (String mode : PubliBikePt.MODES) {
+			String countedAs = PubliBikePt.rideModes().get(mode);
+			assertEquals(PubliBikeSharing.SERVICE_MODE, countedAs);
+			assertTrue(parameters.getASCs().containsKey(countedAs));
+		}
 	}
 
 	@Test

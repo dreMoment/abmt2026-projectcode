@@ -14,8 +14,8 @@ import java.util.Map;
 
 
 public class GlobalAlphaCalibrator extends AlphaCalibrator {
-    public GlobalAlphaCalibrator(Scenario scenario, OutputDirectoryHierarchy outputHierarchy, ModeParameters modeParameters, TripListConverter tripListConverter, Map<String, Double> targetModeShares, Map<String, Double> targetTripsPerDay, List<String> modesToCalibrate, double beta, boolean isActivated, EqasimConfigGroup eqasimConfigGroup) {
-        super(scenario, outputHierarchy, modeParameters, tripListConverter, targetModeShares, targetTripsPerDay, modesToCalibrate, beta, isActivated, eqasimConfigGroup);
+    public GlobalAlphaCalibrator(Scenario scenario, OutputDirectoryHierarchy outputHierarchy, ModeParameters modeParameters, TripListConverter tripListConverter, Map<String, Double> targetModeShares, Map<String, Double> targetTripsPerDay, Map<String, String> countedAs, List<String> modesToCalibrate, double beta, boolean isActivated, EqasimConfigGroup eqasimConfigGroup) {
+        super(scenario, outputHierarchy, modeParameters, tripListConverter, targetModeShares, targetTripsPerDay, countedAs, modesToCalibrate, beta, isActivated, eqasimConfigGroup);
     }
 
     @Override

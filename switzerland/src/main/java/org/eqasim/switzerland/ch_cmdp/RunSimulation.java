@@ -8,6 +8,8 @@ import org.eqasim.switzerland.ch_cmdp.tolls.TollsModule;
 import org.eqasim.switzerland.ch_cmdp.utils.link_stats.DetailedLinkStatisticsModule;
 import org.eqasim.switzerland.ch_cmdp.transit_dwell.SampledTransitDwellConfigGroup;
 import org.eqasim.switzerland.ch_cmdp.transit_dwell.SampledTransitDwellQSimModule;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikePt;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikePtModule;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeRoutingModule;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
 import org.matsim.api.core.v01.Scenario;
@@ -32,7 +34,7 @@ public class RunSimulation {
 		// this is especially important to avoid high waiting times when we cutout scenarios from a larger scenario.
 		CommandLine cmd = new CommandLine.Builder(args) //
 				.requireOptions("config-path") //
-				.allowOptions("publibike-service-path") //
+				.allowOptions("publibike-service-path", "publibike-pt") //
 				.allowPrefixes("mode-parameter", "cost-parameter", "preventwaitingtoentertraffic", "samplingRateForPT") //
 				.build();
 
@@ -44,6 +46,17 @@ public class RunSimulation {
 		// Optional PubliBike bike sharing: --publibike-service-path publibike_service.xml
 		if (cmd.hasOption("publibike-service-path")) {
 			PubliBikeSharing.configure(config, cmd.getOptionStrict("publibike-service-path"));
+
+			// PubliBike combined with public transport, on unless --publibike-pt false
+			String publibikePt = cmd.getOption("publibike-pt").orElse("true");
+			if (!publibikePt.equals("true") && !publibikePt.equals("false")) {
+				throw new IllegalArgumentException("--publibike-pt must be true or false, got: " + publibikePt);
+			}
+			if (publibikePt.equals("true")) {
+				PubliBikePt.configure(config);
+			}
+		} else if (cmd.hasOption("publibike-pt")) {
+			throw new IllegalArgumentException("--publibike-pt needs --publibike-service-path");
 		}
 		cmd.applyConfiguration(config);
 
@@ -71,6 +84,9 @@ public class RunSimulation {
 		if (PubliBikeSharing.isEnabled(config)) {
 			controller.addOverridingModule(new SharingModule());
 			controller.addOverridingModule(new PubliBikeRoutingModule());
+		}
+		if (PubliBikePt.isEnabled(config)) {
+			controller.addOverridingModule(new PubliBikePtModule());
 		}
 		controller.addOverridingModule(new PTPassengerCountsModule());
         controller.addOverridingModule(new PTLinkVolumesModule());

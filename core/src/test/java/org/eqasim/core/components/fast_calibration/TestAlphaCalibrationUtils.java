@@ -40,6 +40,14 @@ public class TestAlphaCalibrationUtils {
     }
 
     @Test
+    public void testCountedModeFollowsTheMapping() {
+        Map<String, String> countedAs = Map.of("bikesharing_pt", "bikesharing");
+        assertEquals("bikesharing", AlphaCalibrationUtils.countedMode("bikesharing_pt", countedAs));
+        assertEquals("bikesharing", AlphaCalibrationUtils.countedMode("bikesharing", countedAs));
+        assertEquals("pt", AlphaCalibrationUtils.countedMode("pt", countedAs));
+    }
+
+    @Test
     public void testConfigReadsTripsPerDay() {
         Config config = ConfigUtils.createConfig();
         AlphaCalibratorConfig calibration = AlphaCalibratorConfig.getOrCreate(config);

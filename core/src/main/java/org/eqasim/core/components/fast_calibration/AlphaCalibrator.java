@@ -32,6 +32,8 @@ public class AlphaCalibrator implements FastCalibration {
     private final Map<String, Double> targetModeShares;
     // simulated trips per day, for modes whose target is a count (e.g. bike sharing rides)
     private final Map<String, Double> targetTripsPerDay;
+    // trip modes that count as another mode in the shares (e.g. bike sharing combined with pt counts as bike sharing)
+    private final Map<String, String> countedAs;
     private final double beta;
     private final boolean isActivated;
     private final List<String> modesToCalibrate;
@@ -83,9 +85,30 @@ public class AlphaCalibrator implements FastCalibration {
                            double beta,
                            boolean isActivated,
                            EqasimConfigGroup eqasimConfigGroup) {
+        this(scenario, outputHierarchy, modeParameters, tripListConverter, targetModeShares, targetTripsPerDay,
+                Map.of(), modesToCalibrate, beta, isActivated, eqasimConfigGroup);
+    }
+
+    /**
+     * @param countedAs trip modes that are counted as another mode, both in the shares and in the considered
+     *                  trips. Use it when several modes share one constant, e.g. bike sharing on its own and
+     *                  bike sharing combined with pt, which both count as bike sharing rides.
+     */
+    public AlphaCalibrator(Scenario scenario,
+                           OutputDirectoryHierarchy outputHierarchy,
+                           ModeParameters modeParameters,
+                           TripListConverter tripListConverter,
+                           Map<String, Double> targetModeShares,
+                           Map<String, Double> targetTripsPerDay,
+                           Map<String, String> countedAs,
+                           List<String> modesToCalibrate,
+                           double beta,
+                           boolean isActivated,
+                           EqasimConfigGroup eqasimConfigGroup) {
 
         this.targetModeShares = new HashMap<>(targetModeShares);
         this.targetTripsPerDay = Map.copyOf(targetTripsPerDay);
+        this.countedAs = Map.copyOf(countedAs);
         this.consideredModes.addAll(targetModeShares.keySet());
         this.consideredModes.addAll(targetTripsPerDay.keySet());
         this.scenario = scenario;
@@ -220,7 +243,12 @@ public class AlphaCalibrator implements FastCalibration {
     /** A trip counts for the shares if it has a considered mode, does not start or end outside, and moves. */
     private boolean isCountedTrip(DiscreteModeChoiceTrip trip) {
         boolean sameLocation = trip.getOriginActivity().getCoord().equals(trip.getDestinationActivity().getCoord());
-        return AlphaCalibrationUtils.isConsideredTrip(trip) && consideredModes.contains(trip.getInitialMode()) && !sameLocation;
+        return AlphaCalibrationUtils.isConsideredTrip(trip) && consideredModes.contains(countedMode(trip)) && !sameLocation;
+    }
+
+    /** The mode a trip is counted as in the shares. */
+    private String countedMode(DiscreteModeChoiceTrip trip) {
+        return AlphaCalibrationUtils.countedMode(trip.getInitialMode(), countedAs);
     }
 
     private boolean usesPtReference() {
@@ -246,7 +274,7 @@ public class AlphaCalibrator implements FastCalibration {
                 List<Integer> tripIdx = personsTracker.getOrDefault(person.getId(), new ArrayList<>());
 
                 for (DiscreteModeChoiceTrip trip : trips) {
-                    String mode = trip.getInitialMode();
+                    String mode = countedMode(trip);
                     // only consider trips with considered modes and different locations
                     if (isCountedTrip(trip)) {
                         estimatedShares.put(mode, estimatedShares.getOrDefault(mode, 0.0) + 1.0);

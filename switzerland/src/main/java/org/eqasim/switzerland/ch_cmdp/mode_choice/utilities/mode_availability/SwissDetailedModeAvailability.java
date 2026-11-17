@@ -7,6 +7,7 @@ import org.matsim.contribs.discrete_mode_choice.model.DiscreteModeChoiceTrip;
 import org.matsim.contribs.discrete_mode_choice.model.mode_availability.ModeAvailability;
 import org.matsim.core.config.Config;
 import org.matsim.core.population.PersonUtils;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikePt;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
 
 import com.google.inject.Inject;
@@ -17,10 +18,12 @@ import static org.eqasim.switzerland.ch_cmdp.mode_choice.utilities.estimators.Ut
 
 public class SwissDetailedModeAvailability implements ModeAvailability {
     private final boolean publibike;
+    private final boolean publibikePt;
 
     @Inject
     public SwissDetailedModeAvailability(Config config) {
         this.publibike = PubliBikeSharing.isEnabled(config);
+        this.publibikePt = PubliBikePt.isEnabled(config);
     }
 
     @Override
@@ -99,6 +102,11 @@ public class SwissDetailedModeAvailability implements ModeAvailability {
         // Bike sharing is open to everyone who is not freight
         if (publibike) {
             modes.add(PubliBikeSharing.SERVICE_MODE);
+        }
+
+        // PubliBike combined with public transport, in either order
+        if (publibikePt) {
+            modes.addAll(PubliBikePt.MODES);
         }
 
         // Add remote walk
