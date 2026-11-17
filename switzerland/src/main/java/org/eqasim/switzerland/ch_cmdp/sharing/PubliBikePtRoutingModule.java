@@ -73,8 +73,7 @@ public class PubliBikePtRoutingModule implements RoutingModule {
 		List<PlanElement> bestRoute = null;
 		double bestArrivalTime = Double.POSITIVE_INFINITY;
 
-		for (Link station : transferStations.findCandidates(bikeEnd, otherEnd, PubliBikePt.MAXIMUM_BIKE_DISTANCE_M,
-				PubliBikePt.CANDIDATE_STATIONS)) {
+		for (Link station : transferStations.findCandidates(bikeEnd, otherEnd, PubliBikePt.CANDIDATE_STATIONS)) {
 			List<PlanElement> route = routeVia(station, request);
 
 			if (route != null) {

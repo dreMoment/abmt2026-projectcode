@@ -31,8 +31,6 @@ public final class PubliBikePt {
 
 	/** A PubliBike station counts as a transfer station if a railway stop is at most this far away. */
 	static public final double TRANSFER_RADIUS_M = 300.0;
-	/** Transfer stations further away (beeline) from the trip origin or destination are not tried. */
-	static public final double MAXIMUM_BIKE_DISTANCE_M = 4000.0;
 	/** Number of transfer stations routed per trip. The one with the earliest arrival is kept. */
 	static public final int CANDIDATE_STATIONS = 3;
 

@@ -39,7 +39,8 @@ public class PubliBikePtModule extends AbstractModule {
 				Key.get(SharingServiceSpecification.class, SharingModes.mode(PubliBikeSharing.SERVICE_MODE)));
 
 		PubliBikeTransferStations stations = PubliBikeTransferStations.create(service.getStations(),
-				scenario.getTransitSchedule(), scenario.getNetwork(), PubliBikePt.TRANSFER_RADIUS_M);
+				scenario.getTransitSchedule(), scenario.getNetwork(), PubliBikePt.TRANSFER_RADIUS_M,
+				PubliBikeSharing.MAXIMUM_ACCESS_EGRESS_DISTANCE_M);
 
 		logger.info(String.format("%d of %d PubliBike stations are within %.0f m of a railway stop",
 				stations.size(), service.getStations().size(), PubliBikePt.TRANSFER_RADIUS_M));

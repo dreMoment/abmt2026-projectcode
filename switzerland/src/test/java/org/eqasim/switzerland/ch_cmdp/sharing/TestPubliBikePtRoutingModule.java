@@ -100,12 +100,12 @@ public class TestPubliBikePtRoutingModule {
 	}
 
 	@Test
-	public void testNoRouteWithoutTransferStationInReach() {
+	public void testNoRouteWithoutStationNearTheBikeEnd() {
 		PubliBikeTestNetwork remote = new PubliBikeTestNetwork();
 		Link from = remote.link("origin", 0.0, 0.0);
 		Link to = remote.link("destination", 20000.0, 0.0);
 		remote.stop("rail", 15000.0, 0.0, "rail");
-		remote.station("station", 15000.0, 0.0); // 15 km from the origin
+		remote.station("station", 15000.0, 0.0); // the only station, 15 km from the origin
 
 		PubliBikePtRoutingModule router = new PubliBikePtRoutingModule(PubliBikePt.ACCESS_MODE, Direction.ACCESS,
 				publibike(Set.of()), pt(Map.of(), Set.of()), remote.transferStations(300.0),

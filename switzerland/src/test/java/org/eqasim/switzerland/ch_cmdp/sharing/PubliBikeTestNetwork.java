@@ -58,6 +58,6 @@ class PubliBikeTestNetwork {
 	}
 
 	PubliBikeTransferStations transferStations(double radius_m) {
-		return PubliBikeTransferStations.create(stations, schedule, network, radius_m);
+		return PubliBikeTransferStations.create(stations, schedule, network, radius_m, 1000.0);
 	}
 }

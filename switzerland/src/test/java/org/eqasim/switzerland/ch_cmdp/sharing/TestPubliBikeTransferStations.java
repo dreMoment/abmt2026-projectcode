@@ -22,8 +22,7 @@ public class TestPubliBikeTransferStations {
 
 		PubliBikeTransferStations stations = test.transferStations(300.0);
 		assertEquals(1, stations.size());
-		assertEquals(List.of(nearRail),
-				stations.findCandidates(new Coord(0.0, 0.0), new Coord(10000.0, 0.0), 4000.0, 3));
+		assertEquals(List.of(nearRail), stations.findCandidates(new Coord(1500.0, 0.0), new Coord(10000.0, 0.0), 3));
 	}
 
 	@Test
@@ -34,24 +33,36 @@ public class TestPubliBikeTransferStations {
 
 		PubliBikeTransferStations stations = test.transferStations(300.0);
 		assertEquals(0, stations.size());
-		assertTrue(stations.findCandidates(new Coord(0.0, 0.0), new Coord(10000.0, 0.0), 4000.0, 3).isEmpty());
+		assertTrue(stations.findCandidates(new Coord(1000.0, 0.0), new Coord(10000.0, 0.0), 3).isEmpty());
 	}
 
 	@Test
-	public void testCandidatesAreInReachTowardsTheOtherEndAndSortedByDetour() {
+	public void testCandidatesAreSortedByDetour() {
 		PubliBikeTestNetwork test = new PubliBikeTestNetwork();
+		test.station("home", 0.0, 0.0);
 		Link onTheWay = transferStation(test, "onTheWay", 1000.0, 0.0);
 		Link aside = transferStation(test, "aside", 1000.0, 2000.0);
-		transferStation(test, "behind", -500.0, 0.0); // further from the destination than the origin is
-		transferStation(test, "tooFar", 5000.0, 0.0); // more than 4 km to ride
+		Link behind = transferStation(test, "behind", -500.0, 0.0); // a short ride away from the destination
+		transferStation(test, "farAside", 0.0, 8000.0);
 
 		PubliBikeTransferStations stations = test.transferStations(300.0);
 		assertEquals(4, stations.size());
 
 		Coord origin = new Coord(0.0, 0.0);
 		Coord destination = new Coord(10000.0, 0.0);
-		assertEquals(List.of(onTheWay, aside), stations.findCandidates(origin, destination, 4000.0, 3));
-		assertEquals(List.of(onTheWay), stations.findCandidates(origin, destination, 4000.0, 1));
+		// detours: onTheWay 10000 m, behind 11000 m, aside about 11456 m, farAside about 20806 m
+		assertEquals(List.of(onTheWay, behind, aside), stations.findCandidates(origin, destination, 3));
+		assertEquals(List.of(onTheWay), stations.findCandidates(origin, destination, 1));
+	}
+
+	@Test
+	public void testNoCandidatesWithoutAStationWithinWalkingDistance() {
+		PubliBikeTestNetwork test = new PubliBikeTestNetwork();
+		transferStation(test, "station", 3000.0, 0.0);
+
+		PubliBikeTransferStations stations = test.transferStations(300.0);
+		assertTrue(stations.findCandidates(new Coord(0.0, 0.0), new Coord(10000.0, 0.0), 3).isEmpty());
+		assertEquals(1, stations.findCandidates(new Coord(2500.0, 0.0), new Coord(10000.0, 0.0), 3).size());
 	}
 
 	private static Link transferStation(PubliBikeTestNetwork test, String id, double x, double y) {

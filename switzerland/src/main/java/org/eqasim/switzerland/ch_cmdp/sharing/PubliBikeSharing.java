@@ -32,7 +32,7 @@ public final class PubliBikeSharing {
 	static public final String MODE = "publibike";
 	static public final String SERVICE_MODE = SharingUtils.MODE_PREFIX + MODE; // the mode choice alternative
 
-	static private final double MAXIMUM_ACCESS_EGRESS_DISTANCE_M = 1000.0;
+	static final double MAXIMUM_ACCESS_EGRESS_DISTANCE_M = 1000.0;
 
 	private PubliBikeSharing() {
 	}

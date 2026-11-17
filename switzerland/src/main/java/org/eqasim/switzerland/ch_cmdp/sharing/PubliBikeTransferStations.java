@@ -26,16 +26,24 @@ import org.matsim.pt.transitSchedule.api.TransitStopFacility;
 public class PubliBikeTransferStations {
 	static public final String RAIL_MODE = "rail";
 
-	private final QuadTree<Link> stations; // null without any transfer station
+	private final List<Link> transferStations;
+	private final QuadTree<Link> allStations; // null without any station
+	private final double maximumAccessDistance_m;
 
-	PubliBikeTransferStations(Collection<Link> stationLinks) {
-		List<Link> links = stationLinks.stream().distinct().toList(); // stations may share a link
-		this.stations = links.isEmpty() ? null : QuadTrees.createQuadTree(links, Link::getCoord, 1.0);
+	PubliBikeTransferStations(Collection<Link> transferStations, Collection<Link> allStations,
+			double maximumAccessDistance_m) {
+		this.transferStations = transferStations.stream().distinct().toList(); // stations may share a link
+		this.allStations = allStations.isEmpty() ? null
+				: QuadTrees.createQuadTree(allStations.stream().distinct().toList(), Link::getCoord, 1.0);
+		this.maximumAccessDistance_m = maximumAccessDistance_m;
 	}
 
-	/** Keeps the PubliBike stations that have a stop served by a rail route within the given radius. */
+	/**
+	 * Keeps the PubliBike stations that have a stop served by a rail route within {@code radius_m}.
+	 * {@code maximumAccessDistance_m} is the walking limit to a station of the PubliBike service.
+	 */
 	static public PubliBikeTransferStations create(Collection<? extends SharingStationSpecification> stations,
-			TransitSchedule schedule, Network network, double radius_m) {
+			TransitSchedule schedule, Network network, double radius_m, double maximumAccessDistance_m) {
 		List<TransitStopFacility> railStops = new ArrayList<>();
 
 		for (TransitLine line : schedule.getTransitLines().values()) {
@@ -48,46 +56,49 @@ public class PubliBikeTransferStations {
 			}
 		}
 
+		List<Link> stationLinks = new ArrayList<>();
+		for (SharingStationSpecification station : stations) {
+			Link link = network.getLinks().get(station.getLinkId());
+			if (link != null) {
+				stationLinks.add(link);
+			}
+		}
+
 		List<Link> transferLinks = new ArrayList<>();
 
 		if (!railStops.isEmpty()) {
 			QuadTree<TransitStopFacility> stopIndex = QuadTrees.createQuadTree(
 					railStops.stream().distinct().toList(), TransitStopFacility::getCoord, 1.0);
 
-			for (SharingStationSpecification station : stations) {
-				Link link = network.getLinks().get(station.getLinkId());
-
-				if (link != null && !stopIndex.getDisk(link.getCoord().getX(), link.getCoord().getY(), radius_m)
-						.isEmpty()) {
+			for (Link link : stationLinks) {
+				if (!stopIndex.getDisk(link.getCoord().getX(), link.getCoord().getY(), radius_m).isEmpty()) {
 					transferLinks.add(link);
 				}
 			}
 		}
 
-		return new PubliBikeTransferStations(transferLinks);
+		return new PubliBikeTransferStations(transferLinks, stationLinks, maximumAccessDistance_m);
 	}
 
 	public int size() {
-		return stations == null ? 0 : stations.size();
+		return transferStations.size();
 	}
 
 	/**
 	 * Transfer stations for a trip whose bike part starts or ends at {@code bikeEnd}, while public transport covers
-	 * the way to or from {@code otherEnd}.
+	 * the way to or from {@code otherEnd}. The stations with the shortest beeline detour
+	 * {@code bikeEnd -> station -> otherEnd} come first.
 	 *
-	 * A station qualifies if it is at most {@code maximumBikeDistance_m} (beeline) from {@code bikeEnd} and closer
-	 * to {@code otherEnd} than {@code bikeEnd} is, so the bike never rides away from the other end. The stations
-	 * with the shortest beeline detour {@code bikeEnd -> station -> otherEnd} come first.
+	 * Without any PubliBike station within walking distance of {@code bikeEnd}, the sharing router finds no ride,
+	 * so there are no candidates.
 	 */
-	public List<Link> findCandidates(Coord bikeEnd, Coord otherEnd, double maximumBikeDistance_m, int maximumCount) {
-		if (stations == null) {
+	public List<Link> findCandidates(Coord bikeEnd, Coord otherEnd, int maximumCount) {
+		if (allStations == null
+				|| allStations.getDisk(bikeEnd.getX(), bikeEnd.getY(), maximumAccessDistance_m).isEmpty()) {
 			return List.of();
 		}
 
-		double tripDistance = CoordUtils.calcEuclideanDistance(bikeEnd, otherEnd);
-
-		return stations.getDisk(bikeEnd.getX(), bikeEnd.getY(), maximumBikeDistance_m).stream()
-				.filter(link -> CoordUtils.calcEuclideanDistance(link.getCoord(), otherEnd) < tripDistance)
+		return transferStations.stream()
 				.sorted(Comparator.comparingDouble((Link link) -> CoordUtils.calcEuclideanDistance(bikeEnd,
 						link.getCoord()) + CoordUtils.calcEuclideanDistance(link.getCoord(), otherEnd))
 						.thenComparing(link -> link.getId().toString()))
