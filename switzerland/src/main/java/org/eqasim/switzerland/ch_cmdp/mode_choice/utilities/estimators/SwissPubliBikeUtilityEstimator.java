@@ -26,6 +26,12 @@ import com.google.inject.Inject;
  * shared bike leg only. Walking to and from the stations is valued like walk
  * travel time. An additional constant (publibike.alpha_u) is zero until
  * calibrated. The PubliBike pay-per-ride fare enters like car and pt costs.
+ *
+ * The utility has two parts. {@link #estimateRideUtility} covers the ride
+ * itself and the person: constants, ride and walk time, fare and the person
+ * terms. The trip terms (purpose, origin, destination, distance) come on top
+ * for a PubliBike-only trip. Trips combined with public transport reuse the
+ * ride part only, see {@link SwissPubliBikePtUtilityEstimator}.
  */
 public class SwissPubliBikeUtilityEstimator extends SwissBikeDetailedUtilityEstimator {
 	private final SwissCmdpModeParameters parameters;
@@ -50,6 +56,31 @@ public class SwissPubliBikeUtilityEstimator extends SwissBikeDetailedUtilityEsti
 
 	@Override
 	public double estimateUtility(Person person, DiscreteModeChoiceTrip trip, List<? extends PlanElement> elements) {
+		double utility = estimateRideUtility(person, trip, elements);
+		// same purpose, location and distance terms as bike
+		utility += estimateHomeDestinationUtility(trip);
+		utility += estimateWorkDestinationUtility(trip);
+		utility += estimateEducationDestinationUtility(trip);
+		utility += estimateShoppingDestinationUtility(trip);
+		utility += estimateLeisureDestinationUtility(trip);
+		utility += estimateOtherDestinationUtility(trip);
+		utility += estimateHomeOriginUtility(trip);
+		utility += estimateDensitiesUtility(trip);
+		utility += estimateShortDistanceUtility(trip);
+		utility += estimatedLongDistanceUtility(trip);
+		utility += estimateUrbanDestinationUtility(trip);
+		utility += estimateUrbancoreDestinationUtility(trip);
+		return utility;
+	}
+
+	/**
+	 * Utility of the PubliBike ride in {@code elements}: bike and PubliBike
+	 * constants, ride time, walking to and from the stations, fare, and the
+	 * person terms of bike. Walk legs count as walking, every other leg as
+	 * riding, so {@code elements} must hold the PubliBike part only.
+	 */
+	public double estimateRideUtility(Person person, DiscreteModeChoiceTrip trip,
+			List<? extends PlanElement> elements) {
 		double rideTime_min = 0.0;
 		double walkTime_min = 0.0;
 
@@ -73,26 +104,14 @@ public class SwissPubliBikeUtilityEstimator extends SwissBikeDetailedUtilityEsti
 				PredictorUtils.calculateEuclideanDistance_km(trip), personVariables.income, parameters);
 		utility += parameters.walk.betaTravelTime_u_min
 				* Math.pow(walkTime_min / parameters.timeScale_min, parameters.walk.travelTimeExponent);
-		// same person, purpose, location, distance and canton terms as bike
+		// same person terms as bike
 		utility += estimateAgeUtility(personVariables);
 		utility += estimateSexUtility(personVariables);
 		utility += estimateRetiredUtility(personVariables);
 		utility += estimateJuniorUtility(personVariables);
 		utility += estimateLowIncomeUtility(personVariables);
 		utility += estimateHighIncomeUtility(personVariables);
-		utility += estimateHomeDestinationUtility(trip);
-		utility += estimateWorkDestinationUtility(trip);
-		utility += estimateEducationDestinationUtility(trip);
-		utility += estimateShoppingDestinationUtility(trip);
-		utility += estimateLeisureDestinationUtility(trip);
-		utility += estimateOtherDestinationUtility(trip);
-		utility += estimateHomeOriginUtility(trip);
-		utility += estimateDensitiesUtility(trip);
 		utility += estimateRegionalUtility(personVariables);
-		utility += estimateShortDistanceUtility(trip);
-		utility += estimatedLongDistanceUtility(trip);
-		utility += estimateUrbanDestinationUtility(trip);
-		utility += estimateUrbancoreDestinationUtility(trip);
 		utility += estimateCantonUtility(person);
 		return utility;
 	}

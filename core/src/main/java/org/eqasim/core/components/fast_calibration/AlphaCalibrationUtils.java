@@ -19,6 +19,11 @@ public class AlphaCalibrationUtils {
         return !originActivity.equals("outside") && !destinationActivity.equals("outside");
     }
 
+    /** The mode a trip of {@code tripMode} is counted as: its entry in {@code countedAs}, or the mode itself. */
+    public static String countedMode(String tripMode, Map<String, String> countedAs) {
+        return countedAs.getOrDefault(tripMode, tripMode);
+    }
+
     public static Boolean isConsideredPerson(Person person, String additionalSubPopulation) {
         Boolean isInThisSubPopulation = (Boolean) person.getAttributes().getAttribute(additionalSubPopulation);
         return !(isInThisSubPopulation != null && isInThisSubPopulation);

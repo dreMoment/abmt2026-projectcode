@@ -1,6 +1,8 @@
 package org.eqasim.switzerland.ch_cmdp.mode_choice;
 
+import org.eqasim.switzerland.ch_cmdp.mode_choice.utilities.estimators.SwissPubliBikePtUtilityEstimator;
 import org.eqasim.switzerland.ch_cmdp.mode_choice.utilities.estimators.SwissPubliBikeUtilityEstimator;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikePt;
 import org.eqasim.switzerland.ch_cmdp.sharing.SharingStationConstraint;
 import java.io.File;
 import java.io.IOException;
@@ -73,6 +75,7 @@ public class SwissModeChoiceModule extends AbstractEqasimExtension {
 	static public final String WALK_ESTIMATOR_NAME = "SwissDetailedWalkEstimator";
 	static public final String CP_ESTIMATOR_NAME = "SwissDetailedCpEstimator";
 	static public final String PUBLIBIKE_ESTIMATOR_NAME = "SwissPubliBikeEstimator";
+	static public final String PUBLIBIKE_PT_ESTIMATOR_NAME = "SwissPubliBikePtEstimator";
 
 	static public final String LOOP_CONSTRAINT_NAME = "LoopModesConstraint";
 	static public final String REMOTE_WALK_CONSTRAINT_NAME = "RemoteWalkConstraint";
@@ -99,6 +102,7 @@ public class SwissModeChoiceModule extends AbstractEqasimExtension {
 		bindUtilityEstimator(WALK_ESTIMATOR_NAME).to(SwissWalkDetailedUtilityEstimator.class);
 		bindUtilityEstimator(CP_ESTIMATOR_NAME).to(SwissCarPassengerDetailedUtilityEstimator.class);
 		bindUtilityEstimator(PUBLIBIKE_ESTIMATOR_NAME).to(SwissPubliBikeUtilityEstimator.class);
+		bindUtilityEstimator(PUBLIBIKE_PT_ESTIMATOR_NAME).to(SwissPubliBikePtUtilityEstimator.class);
 
 		bindCostModel(PT_COST_MODEL_NAME).to(SwissPtCostModel.class);
 
@@ -107,6 +111,7 @@ public class SwissModeChoiceModule extends AbstractEqasimExtension {
 		bind(SwissCarPredictor.class);
 		bind(SwissBikePredictor.class);
 		bind(SwissPtRoutePredictor.class);
+		bind(SwissPubliBikeUtilityEstimator.class); // the ride part of PubliBike + pt trips
 
 		bind(ModeParameters.class).to(SwissCmdpModeParameters.class).asEagerSingleton();
 
@@ -247,7 +252,9 @@ public class SwissModeChoiceModule extends AbstractEqasimExtension {
 		);
 		boolean isActivated = calConfig.isActivate();
 		List<String> modesToCalibrate = calConfig.getCalibratedModes();
-		return new GlobalAlphaCalibrator(scenario,outputHierarchy,modeParameters,tripListConverter,targetModeShares, calConfig.getTripsPerDayMap(), modesToCalibrate, beta, isActivated, eqasimConfigGroup);
+		// PubliBike combined with pt shares the PubliBike constant, so its trips count as PubliBike rides
+		Map<String, String> countedAs = PubliBikePt.isEnabled(getConfig()) ? PubliBikePt.rideModes() : Map.of();
+		return new GlobalAlphaCalibrator(scenario,outputHierarchy,modeParameters,tripListConverter,targetModeShares, calConfig.getTripsPerDayMap(), countedAs, modesToCalibrate, beta, isActivated, eqasimConfigGroup);
 	}
 
 	@Provides

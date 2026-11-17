@@ -3,9 +3,8 @@ package org.eqasim.switzerland.ch_cmdp.sharing;
 import java.util.Collection;
 import java.util.List;
 
-import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Person;
-import org.matsim.contrib.shared_mobility.service.SharingUtils;
+import org.matsim.api.core.v01.population.PlanElement;
 import org.matsim.contribs.discrete_mode_choice.model.DiscreteModeChoiceTrip;
 import org.matsim.contribs.discrete_mode_choice.model.constraints.AbstractTripConstraint;
 import org.matsim.contribs.discrete_mode_choice.model.trip_based.TripConstraint;
@@ -20,6 +19,10 @@ import org.matsim.contribs.discrete_mode_choice.model.trip_based.candidates.Trip
  * station within the maximum access distance, or both use the same station.
  * MATSim then replaces the trip with a plain walk leg. Such a trip contains no
  * pickup and is not a real sharing trip.
+ *
+ * The same holds for PubliBike combined with public transport
+ * ({@link PubliBikePt}): without a transfer station the router returns no
+ * route. A valid combined trip has a pickup and a public transport leg.
  */
 public class SharingStationConstraint extends AbstractTripConstraint {
 	static public final String NAME = "SharingStation";
@@ -27,7 +30,9 @@ public class SharingStationConstraint extends AbstractTripConstraint {
 	@Override
 	public boolean validateAfterEstimation(DiscreteModeChoiceTrip trip, TripCandidate candidate,
 			List<TripCandidate> previousCandidates) {
-		if (!candidate.getMode().equals(PubliBikeSharing.SERVICE_MODE)) {
+		boolean isCombined = PubliBikePt.MODES.contains(candidate.getMode());
+
+		if (!isCombined && !candidate.getMode().equals(PubliBikeSharing.SERVICE_MODE)) {
 			return true;
 		}
 
@@ -35,8 +40,9 @@ public class SharingStationConstraint extends AbstractTripConstraint {
 			throw new IllegalStateException("Sharing candidates must carry their route");
 		}
 
-		return routed.getRoutedPlanElements().stream().anyMatch(element -> element instanceof Activity activity
-				&& activity.getType().equals(SharingUtils.PICKUP_ACTIVITY));
+		List<? extends PlanElement> elements = routed.getRoutedPlanElements();
+		return PubliBikePtRoutingModule.hasPickup(elements)
+				&& (!isCombined || PubliBikePtRoutingModule.hasTransitLeg(elements));
 	}
 
 	static public class Factory implements TripConstraintFactory {
