@@ -10,6 +10,7 @@ import org.matsim.api.core.v01.TransportMode;
 import org.matsim.contrib.shared_mobility.io.SharingServiceSpecification;
 import org.matsim.contrib.shared_mobility.run.SharingModes;
 import org.matsim.core.controler.AbstractModule;
+import org.matsim.core.router.AnalysisMainModeIdentifier;
 import org.matsim.core.router.RoutingModule;
 import org.matsim.core.utils.timing.TimeInterpretation;
 
@@ -30,6 +31,9 @@ public class PubliBikePtModule extends AbstractModule {
 				.toProvider(new RoutingProvider(PubliBikePt.ACCESS_MODE, Direction.ACCESS));
 		addRoutingModuleBinding(PubliBikePt.EGRESS_MODE)
 				.toProvider(new RoutingProvider(PubliBikePt.EGRESS_MODE, Direction.EGRESS));
+
+		// MATSim's default fails on trips with both a PubliBike and a pt leg
+		bind(AnalysisMainModeIdentifier.class).to(PubliBikePtMainModeIdentifier.class);
 	}
 
 	@Provides
