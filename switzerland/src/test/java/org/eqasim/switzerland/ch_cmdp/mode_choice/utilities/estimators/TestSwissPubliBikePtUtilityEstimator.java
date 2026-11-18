@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.eqasim.core.simulation.mode_choice.utilities.UtilityEstimator;
+import org.eqasim.switzerland.ch_cmdp.mode_choice.parameters.SwissCmdpModeParameters;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikePt;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
 import org.junit.Test;
@@ -26,8 +27,9 @@ public class TestSwissPubliBikePtUtilityEstimator {
 	private final List<List<? extends PlanElement>> ptPart = new ArrayList<>();
 	private final List<DiscreteModeChoiceTrip> estimatedTrips = new ArrayList<>();
 
+	private final SwissCmdpModeParameters parameters = SwissCmdpModeParameters.buildDefault();
 	private final SwissPubliBikePtUtilityEstimator estimator = new SwissPubliBikePtUtilityEstimator(
-			recording(ridePart, 2.0), recording(ptPart, 5.0));
+			recording(ridePart, 2.0), recording(ptPart, 5.0), parameters);
 
 	private UtilityEstimator recording(List<List<? extends PlanElement>> parts, double utility) {
 		return (person, trip, elements) -> {
@@ -56,6 +58,17 @@ public class TestSwissPubliBikePtUtilityEstimator {
 			assertSame(trip.getOriginActivity(), estimated.getOriginActivity());
 			assertEquals(trip.getDepartureTime(), estimated.getDepartureTime(), 0.0);
 		}
+	}
+
+	@Test
+	public void testCombinedTripsUseTheirOwnConstant() {
+		List<PlanElement> elements = new ArrayList<>(publibikePart());
+		elements.add(transfer(PubliBikePt.ACCESS_MODE));
+		elements.addAll(ptPart());
+
+		parameters.publibike.alpha_u = 3.0; // PubliBike-only constant, not used here
+		parameters.publibike.alphaPt_u = -0.5;
+		assertEquals(6.5, estimator.estimateUtility(null, trip(), elements), 0.0);
 	}
 
 	@Test

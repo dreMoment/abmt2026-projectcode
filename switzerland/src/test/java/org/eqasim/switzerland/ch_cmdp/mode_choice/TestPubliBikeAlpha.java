@@ -32,24 +32,38 @@ public class TestPubliBikeAlpha {
 	}
 
 	@Test
-	public void testCombinedTripsCountForThePubliBikeAlpha() {
+	public void testCombinedTripsHaveTheirOwnAlpha() {
 		SwissCmdpModeParameters parameters = SwissCmdpModeParameters.buildDefault();
-		for (String mode : PubliBikePt.MODES) {
-			String countedAs = PubliBikePt.rideModes().get(mode);
-			assertEquals(PubliBikeSharing.SERVICE_MODE, countedAs);
-			assertTrue(parameters.getASCs().containsKey(countedAs));
-		}
+		parameters.publibike.alpha_u = 1.9;
+		parameters.publibike.alphaPt_u = -0.4;
+		assertEquals(-0.4, parameters.getASCs().get(PubliBikePt.CALIBRATED_MODE), 1e-12);
+
+		parameters.setASCs(Map.of(PubliBikePt.CALIBRATED_MODE, 0.7));
+		assertEquals(0.7, parameters.publibike.alphaPt_u, 1e-12);
+		assertEquals(1.9, parameters.publibike.alpha_u, 1e-12);
 	}
 
 	@Test
-	public void testPubliBikeAlphaSurvivesTheParameterFile() throws IOException {
+	public void testBothDirectionsCountAsOneCalibratedMode() {
+		for (String mode : PubliBikePt.MODES) {
+			assertEquals(PubliBikePt.CALIBRATED_MODE,
+					PubliBikePt.calibrationModes().getOrDefault(mode, mode));
+		}
+		// PubliBike-only trips are counted on their own
+		assertTrue(!PubliBikePt.calibrationModes().containsKey(PubliBikeSharing.SERVICE_MODE));
+	}
+
+	@Test
+	public void testPubliBikeAlphasSurviveTheParameterFile() throws IOException {
 		SwissCmdpModeParameters parameters = SwissCmdpModeParameters.buildDefault();
 		parameters.publibike.alpha_u = 1.9;
+		parameters.publibike.alphaPt_u = -0.4;
 		File file = folder.newFile("mode_parameters.yml");
 		parameters.saveToYamlFile(file.getPath());
 
 		SwissCmdpModeParameters loaded = SwissCmdpModeParameters.buildDefault();
 		ParameterDefinition.applyFile(file, loaded);
 		assertEquals(1.9, loaded.publibike.alpha_u, 1e-12);
+		assertEquals(-0.4, loaded.publibike.alphaPt_u, 1e-12);
 	}
 }

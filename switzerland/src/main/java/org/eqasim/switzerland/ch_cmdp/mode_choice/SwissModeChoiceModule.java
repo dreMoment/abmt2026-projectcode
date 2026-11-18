@@ -252,8 +252,8 @@ public class SwissModeChoiceModule extends AbstractEqasimExtension {
 		);
 		boolean isActivated = calConfig.isActivate();
 		List<String> modesToCalibrate = calConfig.getCalibratedModes();
-		// PubliBike combined with pt shares the PubliBike constant, so its trips count as PubliBike rides
-		Map<String, String> countedAs = PubliBikePt.isEnabled(getConfig()) ? PubliBikePt.rideModes() : Map.of();
+		// both directions of PubliBike + pt share one constant, so they are counted as one mode
+		Map<String, String> countedAs = PubliBikePt.isEnabled(getConfig()) ? PubliBikePt.calibrationModes() : Map.of();
 		return new GlobalAlphaCalibrator(scenario,outputHierarchy,modeParameters,tripListConverter,targetModeShares, calConfig.getTripsPerDayMap(), countedAs, modesToCalibrate, beta, isActivated, eqasimConfigGroup);
 	}
 

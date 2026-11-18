@@ -24,10 +24,11 @@ import com.google.inject.Inject;
  *
  * The trip is split at the transfer activity. The public transport part gets the full pt utility, including the
  * purpose, destination and distance terms of the whole trip. The PubliBike part adds the ride utility of
- * {@link SwissPubliBikeUtilityEstimator#estimateRideUtility}: bike and PubliBike constants, ride and walk time,
- * fare and the person terms of bike. The trip terms are not counted twice.
+ * {@link SwissPubliBikeUtilityEstimator#estimateRideUtility}: bike constant, ride and walk time, fare and the
+ * person terms of bike. The trip terms are not counted twice.
  *
- * As a result, {@code publibike.alpha_u} shifts PubliBike-only and combined trips by the same amount.
+ * Instead of {@code publibike.alpha_u}, combined trips get their own constant {@code publibike.alphaPt_u}, so the
+ * split between PubliBike-only and combined trips can be calibrated.
  */
 public class SwissPubliBikePtUtilityEstimator implements UtilityEstimator {
 	/** Combined trips are not written to the calibration variables, which describe single modes. */
@@ -56,19 +57,22 @@ public class SwissPubliBikePtUtilityEstimator implements UtilityEstimator {
 
 	private final UtilityEstimator rideEstimator;
 	private final UtilityEstimator ptEstimator;
+	private final SwissCmdpModeParameters parameters;
 
 	@Inject
 	public SwissPubliBikePtUtilityEstimator(SwissPubliBikeUtilityEstimator publibikeEstimator,
 			SwissCmdpModeParameters parameters, SwissCostParameters costParameters, PtPredictor ptPredictor,
 			SwissPersonPredictor personPredictor) {
 		this(publibikeEstimator::estimateRideUtility, new SwissPtDetailedUtilityEstimator(parameters, ptPredictor,
-				personPredictor, NO_VARIABLES, costParameters));
+				personPredictor, NO_VARIABLES, costParameters), parameters);
 	}
 
 	/** @param rideEstimator utility of the PubliBike part, see {@link SwissPubliBikeUtilityEstimator#estimateRideUtility} */
-	SwissPubliBikePtUtilityEstimator(UtilityEstimator rideEstimator, UtilityEstimator ptEstimator) {
+	SwissPubliBikePtUtilityEstimator(UtilityEstimator rideEstimator, UtilityEstimator ptEstimator,
+			SwissCmdpModeParameters parameters) {
 		this.rideEstimator = rideEstimator;
 		this.ptEstimator = ptEstimator;
+		this.parameters = parameters;
 	}
 
 	@Override
@@ -90,7 +94,8 @@ public class SwissPubliBikePtUtilityEstimator implements UtilityEstimator {
 		// pt part apart from those of the pt-only alternative of the same trip.
 		DiscreteModeChoiceTrip tripCopy = copy(trip);
 		return ptEstimator.estimateUtility(person, tripCopy, new ArrayList<>(ptPart))
-				+ rideEstimator.estimateUtility(person, tripCopy, new ArrayList<>(publibikePart));
+				+ rideEstimator.estimateUtility(person, tripCopy, new ArrayList<>(publibikePart))
+				+ parameters.publibike.alphaPt_u;
 	}
 
 	static int findTransferIndex(List<? extends PlanElement> elements) {

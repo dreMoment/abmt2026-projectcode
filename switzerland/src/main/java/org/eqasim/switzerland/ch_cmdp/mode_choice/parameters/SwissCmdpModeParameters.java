@@ -1,6 +1,7 @@
 package org.eqasim.switzerland.ch_cmdp.mode_choice.parameters;
 
 import org.eqasim.switzerland.ch.mode_choice.parameters.SwissModeParameters;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikePt;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
 
 import java.util.HashMap;
@@ -15,9 +16,12 @@ public class SwissCmdpModeParameters extends SwissModeParameters {
     public final SwissCarPassengerParameters cp = new SwissCarPassengerParameters();
     public final SwissPubliBikeParameters publibike = new SwissPubliBikeParameters();
 
-    // Station-based bike sharing: the bike utility plus this constant (not estimated, zero until calibrated)
+    // Station-based bike sharing: the bike utility plus a constant (not estimated, zero until calibrated)
     public static class SwissPubliBikeParameters {
+        // PubliBike-only trips
         public double alpha_u = 0.0;
+        // PubliBike combined with public transport, used instead of alpha_u
+        public double alphaPt_u = 0.0;
     }
 
     public final SwissParking parking = new SwissParking();
@@ -512,6 +516,7 @@ public class SwissCmdpModeParameters extends SwissModeParameters {
         alphas.put("bike", this.bike.alpha_u);
         alphas.put("car_passenger", this.cp.alpha_u);
         alphas.put(PubliBikeSharing.SERVICE_MODE, this.publibike.alpha_u);
+        alphas.put(PubliBikePt.CALIBRATED_MODE, this.publibike.alphaPt_u);
         return alphas;
     }
 
@@ -523,6 +528,7 @@ public class SwissCmdpModeParameters extends SwissModeParameters {
         this.bike.alpha_u = alphas.getOrDefault("bike", this.bike.alpha_u);
         this.cp.alpha_u = alphas.getOrDefault("car_passenger", this.cp.alpha_u);
         this.publibike.alpha_u = alphas.getOrDefault(PubliBikeSharing.SERVICE_MODE, this.publibike.alpha_u);
+        this.publibike.alphaPt_u = alphas.getOrDefault(PubliBikePt.CALIBRATED_MODE, this.publibike.alphaPt_u);
     }
 
     @Override

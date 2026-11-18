@@ -25,7 +25,8 @@ import com.google.inject.Inject;
  * It uses every term of the bike utility, with travel time taken from the
  * shared bike leg only. Walking to and from the stations is valued like walk
  * travel time. An additional constant (publibike.alpha_u) is zero until
- * calibrated. The PubliBike pay-per-ride fare enters like car and pt costs.
+ * calibrated; trips combined with public transport use publibike.alphaPt_u
+ * instead. The PubliBike pay-per-ride fare enters like car and pt costs.
  *
  * The utility has two parts. {@link #estimateRideUtility} covers the ride
  * itself and the person: constants, ride and walk time, fare and the person
@@ -56,7 +57,7 @@ public class SwissPubliBikeUtilityEstimator extends SwissBikeDetailedUtilityEsti
 
 	@Override
 	public double estimateUtility(Person person, DiscreteModeChoiceTrip trip, List<? extends PlanElement> elements) {
-		double utility = estimateRideUtility(person, trip, elements);
+		double utility = estimateRideUtility(person, trip, elements) + parameters.publibike.alpha_u;
 		// same purpose, location and distance terms as bike
 		utility += estimateHomeDestinationUtility(trip);
 		utility += estimateWorkDestinationUtility(trip);
@@ -74,8 +75,8 @@ public class SwissPubliBikeUtilityEstimator extends SwissBikeDetailedUtilityEsti
 	}
 
 	/**
-	 * Utility of the PubliBike ride in {@code elements}: bike and PubliBike
-	 * constants, ride time, walking to and from the stations, fare, and the
+	 * Utility of the PubliBike ride in {@code elements}: the bike constant
+	 * (without the PubliBike constant, which the caller adds), ride time, walking to and from the stations, fare, and the
 	 * person terms of bike. Walk legs count as walking, every other leg as
 	 * riding, so {@code elements} must hold the PubliBike part only.
 	 */
@@ -97,7 +98,7 @@ public class SwissPubliBikeUtilityEstimator extends SwissBikeDetailedUtilityEsti
 		SwissPersonVariables personVariables = personPredictor.predictVariables(person, trip, elements);
 
 		double utility = 0.0;
-		utility += estimateConstantUtility() + parameters.publibike.alpha_u;
+		utility += estimateConstantUtility();
 		utility += estimateTravelTimeUtility(new BikeVariables(rideTime_min));
 		// fare, valued like car and pt costs (with the same distance and income interaction)
 		utility += parameters.betaCost_u_MU * calculateFare_CHF(costParameters, rideTime_min) * Utils.interaction(

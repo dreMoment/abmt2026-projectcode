@@ -19,8 +19,9 @@ import org.matsim.core.config.groups.ScoringConfigGroup.ScoringParameterSet;
  * </ul>
  * Each trip of these modes contains exactly one PubliBike ride. A trip with a ride at both ends is not modelled.
  *
- * The bike part of the trip shares {@code publibike.alpha_u} with the PubliBike-only mode, so a single constant
- * is calibrated against all observed rides.
+ * Both directions share one constant, {@code publibike.alphaPt_u}, separate from the PubliBike-only constant. The
+ * alpha calibrator counts both directions as {@link #CALIBRATED_MODE}, so it can calibrate the two constants against
+ * separate ride targets.
  */
 public final class PubliBikePt {
 	/** PubliBike first, then public transport. */
@@ -28,6 +29,8 @@ public final class PubliBikePt {
 	/** Public transport first, then PubliBike. */
 	static public final String EGRESS_MODE = "pt_publibike";
 	static public final List<String> MODES = List.of(ACCESS_MODE, EGRESS_MODE);
+	/** Name under which the alpha calibrator counts and calibrates the trips of both directions. */
+	static public final String CALIBRATED_MODE = ACCESS_MODE;
 
 	/** A PubliBike station counts as a transfer station if a railway stop is at most this far away. */
 	static public final double TRANSFER_RADIUS_M = 300.0;
@@ -51,9 +54,9 @@ public final class PubliBikePt {
 		return mode + " interaction";
 	}
 
-	/** Trip modes that contain one PubliBike ride, mapped to the mode whose constant is calibrated for them. */
-	static public Map<String, String> rideModes() {
-		return Map.of(ACCESS_MODE, PubliBikeSharing.SERVICE_MODE, EGRESS_MODE, PubliBikeSharing.SERVICE_MODE);
+	/** For the alpha calibrator: both directions count as {@link #CALIBRATED_MODE}. */
+	static public Map<String, String> calibrationModes() {
+		return Map.of(EGRESS_MODE, CALIBRATED_MODE);
 	}
 
 	/** Adds the combined modes. Requires {@link PubliBikeSharing#configure} to have run before. */
