@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -31,14 +32,22 @@ import org.matsim.core.utils.io.IOUtils;
  * Builds a station-based sharing service file from PubliBike stations and a
  * bike snapshot.
  *
- * Inputs are two CSV files. stations.csv has station_id, lat and lng.
- * bikes.csv has bike_id and station_id. Each station is placed on the nearest
- * link that shared bikes are routed on. With --fleet-share (for example 0.1 for a 10%
- * scenario) a seeded random share of bikes is kept. PubliBike stations are
- * never full, so each station can hold the whole fleet.
+ * stations.csv has station_id, lat and lng. Each station is placed on the
+ * nearest link that shared bikes are routed on. The start fleet comes from one
+ * of two CSV files:
  *
- * --network-path network.xml.gz --stations-path stations.csv --bikes-path
- * bikes.csv --output-path publibike_service.xml [--fleet-share 1.0]
+ * - --bikes-path bikes.csv (bike_id, station_id): exactly these bikes.
+ * - --station-means-path station_means.csv (station_id, mean_bikes): each station
+ * gets mean_bikes * fleet-share bikes. The whole part is always placed, the
+ * fractional part is one more bike with that probability (seeded). For example,
+ * 0.83 gives one bike with probability 0.83, and 2.3 gives two or three bikes.
+ * With --fleet-share 0.1 this builds the start fleet of a 10% scenario.
+ *
+ * PubliBike stations are never full, so each station can hold the whole fleet.
+ *
+ * --network-path network.xml.gz --stations-path stations.csv --output-path
+ * publibike_service.xml (--bikes-path bikes.csv | --station-means-path
+ * station_means.csv [--fleet-share 1.0])
  *
  * Station coordinates are WGS84, the network is Swiss LV95 (EPSG:2056).
  */
@@ -47,11 +56,20 @@ public class RunCreatePubliBikeService {
 
 	static public void main(String[] args) throws ConfigurationException, IOException {
 		CommandLine cmd = new CommandLine.Builder(args) //
-				.requireOptions("network-path", "stations-path", "bikes-path", "output-path") //
-				.allowOptions("fleet-share") //
+				.requireOptions("network-path", "stations-path", "output-path") //
+				.allowOptions("bikes-path", "station-means-path", "fleet-share") //
 				.build();
 
-		for (String option : List.of("network-path", "stations-path", "bikes-path")) {
+		boolean fromBikes = cmd.hasOption("bikes-path");
+		if (fromBikes == cmd.hasOption("station-means-path")) {
+			throw new IllegalArgumentException("Give exactly one of --bikes-path and --station-means-path");
+		}
+		if (fromBikes && cmd.hasOption("fleet-share")) {
+			throw new IllegalArgumentException("--fleet-share needs --station-means-path");
+		}
+
+		String fleetOption = fromBikes ? "bikes-path" : "station-means-path";
+		for (String option : List.of("network-path", "stations-path", fleetOption)) {
 			File file = new File(cmd.getOptionStrict(option));
 			if (!file.isFile()) {
 				throw new IllegalArgumentException("--" + option + " not found: " + file.getAbsolutePath());
@@ -59,6 +77,9 @@ public class RunCreatePubliBikeService {
 		}
 
 		double fleetShare = cmd.getOption("fleet-share").map(Double::parseDouble).orElse(1.0);
+		if (!(fleetShare > 0.0 && fleetShare <= 1.0)) {
+			throw new IllegalArgumentException("--fleet-share must be in (0, 1], got " + fleetShare);
+		}
 
 		// Stations are placed on the links that shared bikes are routed on
 		Network fullNetwork = NetworkUtils.readNetwork(cmd.getOptionStrict("network-path"));
@@ -69,12 +90,23 @@ public class RunCreatePubliBikeService {
 		CoordinateTransformation transformation = TransformationFactory
 				.getCoordinateTransformation(TransformationFactory.WGS84, "EPSG:2056");
 
-		// Seeded sample of the fleet, e.g. 10% for a 10% scenario
-		Random random = new Random(0);
 		List<String[]> bikes = new ArrayList<>();
-		for (Map<String, String> row : readCsv(cmd.getOptionStrict("bikes-path"))) {
-			if (random.nextDouble() < fleetShare) {
+		if (fromBikes) {
+			for (Map<String, String> row : readCsv(cmd.getOptionStrict("bikes-path"))) {
 				bikes.add(new String[] { row.get("bike_id"), row.get("station_id") });
+			}
+		} else {
+			Map<String, Double> meanBikes = new LinkedHashMap<>();
+			for (Map<String, String> row : readCsv(cmd.getOptionStrict("station-means-path"))) {
+				meanBikes.put(row.get("station_id"), Double.parseDouble(row.get("mean_bikes")));
+			}
+
+			int index = 0;
+			for (Map.Entry<String, Integer> entry : sampleStationFleet(meanBikes, fleetShare, new Random(0))
+					.entrySet()) {
+				for (int i = 0; i < entry.getValue(); i++) {
+					bikes.add(new String[] { String.format("pb_%04d", ++index), entry.getKey() });
+				}
 			}
 		}
 
@@ -123,6 +155,28 @@ public class RunCreatePubliBikeService {
 
 		System.out.println("Wrote " + stationLinks.size() + " stations and " + bikes.size() + " bikes. "
 				+ farStations + " stations are more than " + MAX_LINK_DISTANCE_M + " m from their link.");
+	}
+
+	/**
+	 * Bikes per station: mean bikes times the fleet share. The whole part is always
+	 * placed; the fractional part becomes one more bike with that probability.
+	 */
+	static Map<String, Integer> sampleStationFleet(Map<String, Double> meanBikes, double fleetShare,
+			Random random) {
+		Map<String, Integer> counts = new LinkedHashMap<>();
+
+		for (Map.Entry<String, Double> entry : meanBikes.entrySet()) {
+			double expected = entry.getValue() * fleetShare;
+			int count = (int) Math.floor(expected);
+
+			if (random.nextDouble() < expected - count) {
+				count++;
+			}
+
+			counts.put(entry.getKey(), count);
+		}
+
+		return counts;
 	}
 
 	static private List<Map<String, String>> readCsv(String path) throws IOException {
