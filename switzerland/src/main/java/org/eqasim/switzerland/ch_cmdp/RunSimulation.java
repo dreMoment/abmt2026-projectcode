@@ -8,6 +8,7 @@ import org.eqasim.switzerland.ch_cmdp.tolls.TollsModule;
 import org.eqasim.switzerland.ch_cmdp.utils.link_stats.DetailedLinkStatisticsModule;
 import org.eqasim.switzerland.ch_cmdp.transit_dwell.SampledTransitDwellConfigGroup;
 import org.eqasim.switzerland.ch_cmdp.transit_dwell.SampledTransitDwellQSimModule;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeMembership;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeRoutingModule;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
 import org.matsim.api.core.v01.Scenario;
@@ -32,7 +33,8 @@ public class RunSimulation {
 		// this is especially important to avoid high waiting times when we cutout scenarios from a larger scenario.
 		CommandLine cmd = new CommandLine.Builder(args) //
 				.requireOptions("config-path") //
-				.allowOptions("publibike-service-path") //
+				.allowOptions("publibike-service-path", "publibike-member-rate-urban",
+						"publibike-member-rate-intermediate", "publibike-member-rate-rural") //
 				.allowPrefixes("mode-parameter", "cost-parameter", "preventwaitingtoentertraffic", "samplingRateForPT") //
 				.build();
 
@@ -64,6 +66,19 @@ public class RunSimulation {
 		configurator.adjustScenario(scenario);
 		if (PubliBikeSharing.isEnabled(config)) {
 			PubliBikeSharing.adjustNetwork(scenario.getNetwork());
+
+			// Only members may use PubliBike, drawn with the MZMV 2021 rates by home area and age
+			PubliBikeMembership.Rates rates = new PubliBikeMembership.Rates();
+			if (cmd.hasOption("publibike-member-rate-urban")) {
+				rates.urban = Double.parseDouble(cmd.getOptionStrict("publibike-member-rate-urban"));
+			}
+			if (cmd.hasOption("publibike-member-rate-intermediate")) {
+				rates.intermediate = Double.parseDouble(cmd.getOptionStrict("publibike-member-rate-intermediate"));
+			}
+			if (cmd.hasOption("publibike-member-rate-rural")) {
+				rates.rural = Double.parseDouble(cmd.getOptionStrict("publibike-member-rate-rural"));
+			}
+			PubliBikeMembership.assign(scenario.getPopulation(), rates, config.global().getRandomSeed());
 		}
 		configurator.adjustPTpcu(scenario);
 		Controler controller = new Controler(scenario);

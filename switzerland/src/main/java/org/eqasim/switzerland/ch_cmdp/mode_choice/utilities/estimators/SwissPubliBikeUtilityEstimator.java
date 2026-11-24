@@ -25,7 +25,8 @@ import com.google.inject.Inject;
  * It uses every term of the bike utility, with travel time taken from the
  * shared bike leg only. Walking to and from the stations is valued like walk
  * travel time. An additional constant (publibike.alpha_u) is zero until
- * calibrated. The PubliBike pay-per-ride fare enters like car and pt costs.
+ * calibrated. The PubliBike member fare (one tariff weighted over the
+ * subscription types, see SwissCostParameters) enters like car and pt costs.
  */
 public class SwissPubliBikeUtilityEstimator extends SwissBikeDetailedUtilityEstimator {
 	private final SwissCmdpModeParameters parameters;
@@ -41,10 +42,10 @@ public class SwissPubliBikeUtilityEstimator extends SwissBikeDetailedUtilityEsti
 		this.personPredictor = personPredictor;
 	}
 
-	/** Pay-per-ride fare for a rental of the given duration. */
+	/** Fare for a rental of the given duration: base fare, then every started minute, capped. */
 	static public double calculateFare_CHF(SwissCostParameters costParameters, double rideTime_min) {
-		double extraMinutes = Math.max(0.0, Math.ceil(rideTime_min - 30.0));
-		double fare = costParameters.publibikeFirst30min_CHF + extraMinutes * costParameters.publibikeExtraMinute_CHF;
+		double extraMinutes = Math.max(0.0, Math.ceil(rideTime_min - costParameters.publibikeIncludedMinutes));
+		double fare = costParameters.publibikeBaseFare_CHF + extraMinutes * costParameters.publibikeExtraMinute_CHF;
 		return Math.min(fare, costParameters.publibikeMaximum_CHF);
 	}
 
