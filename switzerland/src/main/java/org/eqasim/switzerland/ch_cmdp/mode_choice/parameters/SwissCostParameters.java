@@ -16,8 +16,9 @@ public class SwissCostParameters implements ParameterDefinition {
 
 	public double ptRegionalRadius_km = 0.0;
 
-	// PubliBike pay-per-ride fare (B-Quick, no subscription)
-	public double publibikeFirst30min_CHF = 0.0;
+	// PubliBike fare per ride: a base fare for the first minutes, then a price per minute, capped
+	public double publibikeBaseFare_CHF = 0.0;
+	public double publibikeIncludedMinutes = 0.0;
 	public double publibikeExtraMinute_CHF = 0.0;
 	public double publibikeMaximum_CHF = 0.0;
 
@@ -36,12 +37,15 @@ public class SwissCostParameters implements ParameterDefinition {
 
 		parameters.ptRegionalRadius_km = 10.0;
 
-		// PubliBike B-Quick tariff (2026): bike CHF 3 / e-bike CHF 5 for 30 min, then CHF 0.10 / 0.20
-		// per minute, capped at CHF 24 / 48. The model pools both, so prices are weighted by the
-		// e-bike share of the Zurich fleet (1439 of 2298 bikes = 62.6%, snapshot 3 Nov 2026).
-		parameters.publibikeFirst30min_CHF = 4.25;
-		parameters.publibikeExtraMinute_CHF = 0.163;
-		parameters.publibikeMaximum_CHF = 39.0;
+		// PubliBike: one subscription with one fare per ride, following Schütze (2023, ETH master
+		// thesis, PubliBike in Zurich, Table 1). The three tariffs (e-bike prices, annual fees not
+		// counted) are weighted by their share of rides in Zurich: BusinessBike 76% (CHF 0 base,
+		// max 40), B-Fit 15.5% (CHF 3.50 base, max 48), B-Quick 8.5% (CHF 5.50 base, max 48).
+		// The base fare covers the first 30 minutes, then all charge CHF 0.10 per minute.
+		parameters.publibikeBaseFare_CHF = 0.76 * 0.0 + 0.155 * 3.50 + 0.085 * 5.50; // 1.01
+		parameters.publibikeIncludedMinutes = 30.0;
+		parameters.publibikeExtraMinute_CHF = 0.10;
+		parameters.publibikeMaximum_CHF = 0.76 * 40.0 + 0.155 * 48.0 + 0.085 * 48.0; // 41.92
 
 		return parameters;
 	}

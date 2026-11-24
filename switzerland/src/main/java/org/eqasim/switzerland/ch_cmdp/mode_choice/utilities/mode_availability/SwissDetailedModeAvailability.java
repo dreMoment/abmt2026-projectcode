@@ -7,6 +7,7 @@ import org.matsim.contribs.discrete_mode_choice.model.DiscreteModeChoiceTrip;
 import org.matsim.contribs.discrete_mode_choice.model.mode_availability.ModeAvailability;
 import org.matsim.core.config.Config;
 import org.matsim.core.population.PersonUtils;
+import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeMembership;
 import org.eqasim.switzerland.ch_cmdp.sharing.PubliBikeSharing;
 
 import com.google.inject.Inject;
@@ -96,8 +97,8 @@ public class SwissDetailedModeAvailability implements ModeAvailability {
             }
         }
 
-        // Bike sharing is open to everyone who is not freight
-        if (publibike) {
+        // Bike sharing is open to PubliBike members only (see PubliBikeMembership)
+        if (publibike && PubliBikeMembership.isMember(person)) {
             modes.add(PubliBikeSharing.SERVICE_MODE);
         }
 
