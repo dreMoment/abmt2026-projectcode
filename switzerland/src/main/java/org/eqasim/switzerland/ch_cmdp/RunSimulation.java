@@ -34,7 +34,8 @@ public class RunSimulation {
 		CommandLine cmd = new CommandLine.Builder(args) //
 				.requireOptions("config-path") //
 				.allowOptions("publibike-service-path", "publibike-member-rate-urban",
-						"publibike-member-rate-intermediate", "publibike-member-rate-rural") //
+						"publibike-member-rate-intermediate", "publibike-member-rate-rural",
+						"publibike-member-profile") //
 				.allowPrefixes("mode-parameter", "cost-parameter", "preventwaitingtoentertraffic", "samplingRateForPT") //
 				.build();
 
@@ -67,7 +68,8 @@ public class RunSimulation {
 		if (PubliBikeSharing.isEnabled(config)) {
 			PubliBikeSharing.adjustNetwork(scenario.getNetwork());
 
-			// Only members may use PubliBike, drawn with the MZMV 2021 rates by home area and age
+			// Only members may use PubliBike, drawn with the MZMV 2021 rates by home area and a member
+			// profile (uniform 16-65 by default, or commuter: 18-45 with work or education)
 			PubliBikeMembership.Rates rates = new PubliBikeMembership.Rates();
 			if (cmd.hasOption("publibike-member-rate-urban")) {
 				rates.urban = Double.parseDouble(cmd.getOptionStrict("publibike-member-rate-urban"));
@@ -78,7 +80,10 @@ public class RunSimulation {
 			if (cmd.hasOption("publibike-member-rate-rural")) {
 				rates.rural = Double.parseDouble(cmd.getOptionStrict("publibike-member-rate-rural"));
 			}
-			PubliBikeMembership.assign(scenario.getPopulation(), rates, config.global().getRandomSeed());
+			PubliBikeMembership.Profile profile = cmd.hasOption("publibike-member-profile")
+					? PubliBikeMembership.Profile.parse(cmd.getOptionStrict("publibike-member-profile"))
+					: PubliBikeMembership.Profile.UNIFORM;
+			PubliBikeMembership.assign(scenario.getPopulation(), rates, profile, config.global().getRandomSeed());
 		}
 		configurator.adjustPTpcu(scenario);
 		Controler controller = new Controler(scenario);
