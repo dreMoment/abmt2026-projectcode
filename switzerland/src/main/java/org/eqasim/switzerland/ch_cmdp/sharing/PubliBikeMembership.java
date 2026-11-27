@@ -21,9 +21,15 @@ import org.matsim.api.core.v01.population.Population;
  * Bevölkerung", table T 2.1.4.1) by home municipality, applied to the adults
  * (18+) living there: urban 2.0%, intermediate 0.9%, rural 0.5%.
  *
- * Who: as in Schütze (2023, ETH master thesis, PubliBike in Zurich), only
- * agents aged 16 to 65 may be members. In each area, the members are drawn with
- * the same probability among the agents aged 16 to 65 living there.
+ * Who: set by the {@link Profile}. The default, {@link Profile#UNIFORM}, follows
+ * Schütze (2023, ETH master thesis, PubliBike in Zurich): in each area, the
+ * members are drawn with the same probability among the agents aged 16 to 65
+ * living there. {@link Profile#COMMUTER} draws the same number of members per
+ * area, but only among agents aged 18 to 45 whose plan has a work or education
+ * activity, the user profile of Reck and Axhausen (young, employed, educated).
+ * The plan stands in for "employed or student", because the population has no
+ * education attribute. {@link Profile#COMMUTER_INCOME} also weights the draw by
+ * the household income per capita.
  *
  * Municipality types of the population: "urbancore" and "urban" count as
  * urban, "suburban" as intermediate, "rural" as rural. Persons without a home
@@ -38,9 +44,35 @@ public final class PubliBikeMembership {
 	static private final Logger logger = LogManager.getLogger(PubliBikeMembership.class);
 
 	static public final String ATTRIBUTE = "isPubliBikeMember";
-	static public final int MINIMUM_AGE = 16;
-	static public final int MAXIMUM_AGE = 65;
 	static public final int ADULT_AGE = 18;
+	static public final String INCOME_ATTRIBUTE = "incomePerCapita";
+
+	/** Who may be a member, and how members are drawn among them. */
+	public enum Profile {
+		/** Aged 16 to 65, all with the same chance (Schütze 2023). */
+		UNIFORM(16, 65, false, false),
+		/** Aged 18 to 45 with a work or education activity, all with the same chance. */
+		COMMUTER(18, 45, true, false),
+		/** As COMMUTER, with the chance proportional to household income per capita. */
+		COMMUTER_INCOME(18, 45, true, true);
+
+		public final int minimumAge;
+		public final int maximumAge;
+		public final boolean requiresWorkOrEducation;
+		public final boolean incomeWeighted;
+
+		Profile(int minimumAge, int maximumAge, boolean requiresWorkOrEducation, boolean incomeWeighted) {
+			this.minimumAge = minimumAge;
+			this.maximumAge = maximumAge;
+			this.requiresWorkOrEducation = requiresWorkOrEducation;
+			this.incomeWeighted = incomeWeighted;
+		}
+
+		/** Parses "uniform", "commuter" or "commuter_income" (also with a dash). */
+		static public Profile parse(String value) {
+			return valueOf(value.trim().toUpperCase().replace('-', '_'));
+		}
+	}
 
 	public enum Area {
 		URBAN, INTERMEDIATE, RURAL
@@ -68,8 +100,40 @@ public final class PubliBikeMembership {
 		return Boolean.TRUE.equals(person.getAttributes().getAttribute(ATTRIBUTE));
 	}
 
-	static boolean isEligibleAge(int age) {
-		return age >= MINIMUM_AGE && age <= MAXIMUM_AGE;
+	static boolean isEligible(Person person, int age, Profile profile) {
+		if (age < profile.minimumAge || age > profile.maximumAge) {
+			return false;
+		}
+
+		return !profile.requiresWorkOrEducation || hasWorkOrEducation(person);
+	}
+
+	/** Whether the selected plan has a work or education activity. */
+	static boolean hasWorkOrEducation(Person person) {
+		if (person.getSelectedPlan() == null) {
+			return false;
+		}
+
+		for (PlanElement element : person.getSelectedPlan().getPlanElements()) {
+			if (element instanceof Activity activity
+					&& (activity.getType().equals("work") || activity.getType().equals("education"))) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/** Draw weight: 1, or the household income per capita (missing or negative counts as 0). */
+	static double getWeight(Person person, Profile profile) {
+		if (!profile.incomeWeighted) {
+			return 1.0;
+		}
+
+		Object income = person.getAttributes().getAttribute(INCOME_ATTRIBUTE);
+		double value = income instanceof Number number ? number.doubleValue()
+				: income == null ? 0.0 : Double.parseDouble(income.toString());
+		return Math.max(0.0, value);
 	}
 
 	/** Maps a municipality type of the population to a Microcensus area, or null. */
@@ -110,12 +174,18 @@ public final class PubliBikeMembership {
 		return age instanceof Number number ? number.intValue() : null;
 	}
 
+	/** Draws the members with the {@link Profile#UNIFORM} profile. */
+	static public int assign(Population population, Rates rates, long seed) {
+		return assign(population, rates, Profile.UNIFORM, seed);
+	}
+
 	/**
-	 * Draws the members and stores {@value #ATTRIBUTE} on every person.
+	 * Draws the members and stores {@value #ATTRIBUTE} on every person. Each area
+	 * gets rate x adults members, whatever the profile.
 	 *
 	 * @return the number of members
 	 */
-	static public int assign(Population population, Rates rates, long seed) {
+	static public int assign(Population population, Rates rates, Profile profile, long seed) {
 		for (Area area : Area.values()) {
 			if (rates.get(area) < 0.0 || rates.get(area) > 1.0) {
 				throw new IllegalArgumentException("PubliBike member rate must be between 0 and 1: " + area);
@@ -129,6 +199,7 @@ public final class PubliBikeMembership {
 		int areas = Area.values().length;
 		int[] adults = new int[areas];
 		int[] eligible = new int[areas];
+		double[] weight = new double[areas];
 		int withArea = 0;
 		int withoutArea = 0;
 
@@ -152,8 +223,9 @@ public final class PubliBikeMembership {
 				adults[area.ordinal()]++;
 			}
 
-			if (isEligibleAge(age)) {
+			if (isEligible(person, age, profile)) {
 				eligible[area.ordinal()]++;
+				weight[area.ordinal()] += getWeight(person, profile);
 			}
 		}
 
@@ -162,13 +234,15 @@ public final class PubliBikeMembership {
 					+ "so PubliBike members cannot be drawn by home area.");
 		}
 
-		// members per area = rate x adults, spread over the persons aged 16 to 65
-		double[] probability = new double[areas];
+		// members per area = rate x adults, spread over the eligible persons by weight:
+		// a person's chance is targetMembers x weight / total weight (at most 1)
+		double[] scale = new double[areas];
+		double[] targetMembers = new double[areas];
 
 		for (Area area : Area.values()) {
 			int a = area.ordinal();
-			double targetMembers = rates.get(area) * adults[a];
-			probability[a] = eligible[a] > 0 ? Math.min(1.0, targetMembers / eligible[a]) : 0.0;
+			targetMembers[a] = rates.get(area) * adults[a];
+			scale[a] = weight[a] > 0.0 ? targetMembers[a] / weight[a] : 0.0;
 		}
 
 		Random random = new Random(seed);
@@ -180,8 +254,9 @@ public final class PubliBikeMembership {
 			Integer age = getAge(person);
 			Area area = age == null ? null : getHomeArea(person);
 
-			if (age != null && area != null && isEligibleAge(age)) {
-				member = random.nextDouble() < probability[area.ordinal()];
+			if (age != null && area != null && isEligible(person, age, profile)) {
+				double probability = Math.min(1.0, scale[area.ordinal()] * getWeight(person, profile));
+				member = random.nextDouble() < probability;
 
 				if (member) {
 					members[area.ordinal()]++;
@@ -192,14 +267,22 @@ public final class PubliBikeMembership {
 			person.getAttributes().putAttribute(ATTRIBUTE, member);
 		}
 
-		logger.info(String.format("PubliBike members: %d of %d persons", memberTotal, persons.size()));
+		logger.info(String.format("PubliBike members (profile %s): %d of %d persons", profile, memberTotal,
+				persons.size()));
 
 		for (Area area : Area.values()) {
 			int a = area.ordinal();
 			logger.info(String.format(
-					"  %s (rate %.2f%% of %d adults): %d members of %d persons aged %d-%d (p = %.4f)", area,
-					100.0 * rates.get(area), adults[a], members[a], eligible[a], MINIMUM_AGE, MAXIMUM_AGE,
-					probability[a]));
+					"  %s (rate %.2f%% of %d adults = %.0f): %d members of %d eligible persons aged %d-%d%s%s", area,
+					100.0 * rates.get(area), adults[a], targetMembers[a], members[a], eligible[a],
+					profile.minimumAge, profile.maximumAge,
+					profile.requiresWorkOrEducation ? " with work or education" : "",
+					profile.incomeWeighted ? ", weighted by income per capita" : ""));
+
+			if (eligible[a] > 0 && targetMembers[a] > 0.0 && members[a] < 0.9 * targetMembers[a]) {
+				logger.warn(String.format("  %s: fewer members than the rate gives (too few eligible persons, "
+						+ "or chances capped at 1)", area));
+			}
 		}
 
 		if (withoutArea > 0) {
